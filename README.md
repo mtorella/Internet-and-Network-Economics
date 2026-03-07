@@ -1,51 +1,54 @@
-# Internet and Network Economics - Group Project
+# Internet and Network Economics — Group Project
 
-## EUKLEMS Growth Accounts Dataset Analysis
+## Digital Transition, Supply-Chain Structure and Productivity in the Italian Economy
 
-This project performs exploratory data analysis on the EUKLEMS Growth Accounts dataset to assess feasibility of:
-- Constructing industry-level productivity time series
-- Building inter-industry productivity co-movement networks
-- Overlaying AI/software intensity measures
-- Performing dynamic (pre/post 2015) comparison
+This project combines input-output economics, network analysis, and productivity econometrics to study Italy's position in the global digital-transition landscape. Using the OECD Inter-Country Input-Output (ICIO) table (2022 release) and the EUKLEMS Growth Accounts, it identifies which Italian sectors are structurally central but digitally underinvested — the so-called *bottleneck* sectors — and maps those findings to Industria 4.0 policy instruments.
 
-## Setup Instructions
+The analysis is structured as a pipeline of Jupyter notebooks that must be run in order.
 
-### Data Requirements
-
-1. Create a `data/` folder in the project root directory
-2. Download the EUKLEMS Growth Accounts dataset (CSV format)
-3. Place the dataset file in the `data/` folder
-4. If your dataset filename differs from `growth accounts.csv`, update the path in [analysis.ipynb](analysis.ipynb):
-
-```python
-# Update this line with your dataset filename
-data_path = Path('data/growth accounts.csv')
-```
-
-### Dependencies
-
-Install required Python packages:
-```bash
-pip install pandas numpy matplotlib seaborn
-```
+---
 
 ## Project Structure
 
 ```
 .
-├── analysis.ipynb          # Main exploratory data analysis notebook
-├── data/                   # Dataset folder (not tracked by git)
-│   └── growth accounts.csv # EUKLEMS dataset (add manually)
-└── README.md              # This file
+├── notebooks/
+│   ├── 1_EDA_EUKLEMS.ipynb          # EUKLEMS data exploration and feasibility assessment
+│   └── 2_EDA_IO_Matrix.ipynb        # ICIO matrix analysis, Leontief inverse, digital intensity
+│
+├── data/
+│   ├── raw/                         # Original source files (not tracked by git)
+│   │   ├── 2022.csv                 # OECD ICIO table (2022 release)
+│   │   └── growth accounts.csv      # EUKLEMS Growth Accounts
+│   └── prepared/                    # Intermediate outputs written by the notebooks (to be populated)
+│   
+│
+├── outputs/
+│   ├── figures/                     # All plots (PNG, 150 dpi)
+│   └── tables/                      # Exported CSV tables (centrality, regression results, policy ranking)
+│
+└── README.md
 ```
 
-## Usage
+---
 
-1. Ensure dataset is placed in `data/` folder
-2. Update the data path in the notebook if necessary
-3. Open `analysis.ipynb` in Jupyter or VS Code
-4. Run all cells to perform the exploratory data analysis
+### Data Sources
 
-## Note
+| File | Source | Notes |
+|------|--------|-------|
+| `data/raw/2022.csv` | [OECD ICIO 2023 edition](https://www.oecd.org/sti/ind/inter-country-input-output-tables.htm) | ~4 250 country-sector rows × 4 737 columns; reference year 2022 |
+| `data/raw/growth accounts.csv` | [EUKLEMS & INTANProd](https://euklems-intanprod-llee.luiss.it/) | Industry-level TFP, labour productivity, capital services, 2000–2022 |
 
-The `data/` folder is excluded from version control via `.gitignore` to avoid committing large dataset files.
+Both files must be placed in `data/raw/` before running any notebook.
+
+---
+
+### Notebooks
+
+- `1_EDA_EUKLEMS.ipynb` — Explores the structure and coverage of the EUKLEMS Growth Accounts, assesses their suitability for productivity analysis, and prepares a clean industry-level dataset for later merging with ICIO-based indicators.
+- `2_EDA_IO_Matrix.ipynb` — Examines the structure of the OECD ICIO table, asserts its validity, and isolates the Z block of intermediate transactions.
+
+## Methodological Notes
+
+### Network Construction
+The network is constructed from the ICIO intermediate flow matrix Z by first computing the technical coefficient matrix A, where each entry $a_{ij}$ represents the value of inputs purchased from sector $i$ per unit of output produced by sector $j$. Rather than restricting the analysis to the domestic Italian block alone, which would imply a closed economy assumption, we retain the full international dimension of the matrix. The 50 Italian sectors are kept as individual nodes, while all non-Italian country-sector pairs are aggregated into 50 Rest of World nodes grouped by sector type, for a total of 100 nodes. The weight of each edge between a ROW node and an Italian node is the sum of all input flows from that sector type across all foreign countries into the corresponding Italian sector. This approach preserves the interpretability of an Italy-focused network while correctly accounting for the dependence of Italian sectors on foreign intermediate inputs.

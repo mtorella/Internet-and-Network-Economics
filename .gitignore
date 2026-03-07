@@ -22,4 +22,9 @@ ENV/
 .DS_Store
 Thumbs.db
 
-no.py
+# Resources
+Resources/
+
+# Outputs
+outputs/
+
