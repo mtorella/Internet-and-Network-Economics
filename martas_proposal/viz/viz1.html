@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Italy in the Global Supply Network</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f1117; font-family: 'Segoe UI', sans-serif; color: #ccc; overflow: hidden; }
+
+  #container { position: relative; width: 100vw; height: 100vh; }
+  svg { width: 100%; height: 100%; }
+
+  .arc { transition: opacity 0.2s; cursor: default; }
+  .arc.dimmed { opacity: 0.04; }
+  .arc.highlighted { opacity: 1 !important; }
+
+  .node-ita { cursor: pointer; }
+  .node-ita:hover circle { stroke: white; stroke-width: 2px; }
+
+  .node-foreign { cursor: default; }
+
+  .label-ita { font-size: 11px; fill: #ddd; pointer-events: none; }
+  .label-country {
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .label-country:hover { opacity: 0.7; }
+  .label-country.active { text-decoration: underline; }
+
+  /* Tooltip */
+  #tooltip {
+    position: absolute; pointer-events: none;
+    background: #1a1d27; border: 1px solid #333344;
+    border-radius: 8px; padding: 12px 16px;
+    font-size: 12px; color: #ccc;
+    max-width: 240px; opacity: 0;
+    transition: opacity 0.15s;
+    line-height: 1.6;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  #tooltip.visible { opacity: 1; }
+  #tooltip .sector-name { font-size: 14px; font-weight: 700; color: white; margin-bottom: 6px; }
+  #tooltip .stat { display: flex; justify-content: space-between; gap: 16px; }
+  #tooltip .stat span:last-child { color: white; font-weight: 600; }
+  #tooltip .partners-title { margin-top: 8px; margin-bottom: 3px; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  #tooltip .partner-row { display: flex; justify-content: space-between; gap: 12px; }
+
+  /* Legend */
+  #legend {
+    position: absolute; bottom: 20px; left: 20px;
+    background: rgba(26,29,39,0.95); border: 1px solid #333344;
+    border-radius: 8px; padding: 12px 16px; font-size: 11px;
+  }
+  #legend .leg-item { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  #legend .leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Instructions */
+  #instructions {
+    position: absolute; top: 16px; right: 20px;
+    background: rgba(26,29,39,0.9); border: 1px solid #333344;
+    border-radius: 8px; padding: 10px 14px; font-size: 11px; color: #888;
+    line-height: 1.8;
+  }
+
+  /* Active country filter indicator */
+  #filter-indicator {
+    position: absolute; top: 16px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(26,29,39,0.95); border: 1px solid #444;
+    border-radius: 20px; padding: 6px 16px;
+    font-size: 12px; color: #aaa;
+    opacity: 0; transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  #filter-indicator.visible { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="container">
+  <svg id="svg"></svg>
+  <div id="tooltip"></div>
+  <div id="legend">
+    <div style="font-size:12px;font-weight:700;color:white;margin-bottom:8px;">Italian sectors</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#4FC3F7"></div>Digital / ICT</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#FFB74D"></div>Manufacturing</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#81C784"></div>Business services</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#F48FB1"></div>Trade & transport</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#CE93D8"></div>Utilities & construction</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#90A4AE"></div>Other</div>
+  </div>
+  <div id="instructions">
+    <b style="color:#ddd">Interactions</b><br>
+    Hover sector → tooltip + highlight arcs<br>
+    Click country name → filter to that country<br>
+    Click country again → clear filter
+  </div>
+  <div id="filter-indicator" id="filter-indicator"></div>
+</div>
+
+<script>
+const RAW = {"nodes": [{"id": "ITA_Q", "x": 0.0, "y": 1.0, "label": "Health", "sector": "Q", "country": "ITA", "pagerank": 0.2051, "in_strength": 75.3, "out_strength": 14.7, "color": "#90A4AE", "size": 9.586264950246722, "top3": [{"country": "DEU", "flow": 1.8}, {"country": "IRL", "flow": 1.4}, {"country": "FRA", "flow": 0.8}], "is_ita": true}, {"id": "ITA_F", "x": 0.0, "y": 0.9591836734693877, "label": "Construction", "sector": "F", "country": "ITA", "pagerank": 0.1822, "in_strength": 188.2, "out_strength": 107.8, "color": "#CE93D8", "size": 9.186680594286312, "top3": [{"country": "DEU", "flow": 3.8}, {"country": "CN1", "flow": 2.6}, {"country": "FRA", "flow": 2.2}], "is_ita": true}, {"id": "ITA_C10T12", "x": 0.0, "y": 0.9183673469387755, "label": "Food & bev.", "sector": "C10T12", "country": "ITA", "pagerank": 0.1809, "in_strength": 137.5, "out_strength": 46.4, "color": "#FFB74D", "size": 9.164278451931805, "top3": [{"country": "FRA", "flow": 3.7}, {"country": "DEU", "flow": 3.3}, {"country": "ESP", "flow": 2.2}], "is_ita": true}, {"id": "ITA_G", "x": 0.0, "y": 0.8775510204081632, "label": "Wholesale & retail", "sector": "G", "country": "ITA", "pagerank": 0.1543, "in_strength": 206.7, "out_strength": 233.4, "color": "#F48FB1", "size": 8.698279466466186, "top3": [{"country": "DEU", "flow": 7.1}, {"country": "FRA", "flow": 6.3}, {"country": "USA", "flow": 3.8}], "is_ita": true}, {"id": "ITA_C13T15", "x": 0.0, "y": 0.8367346938775511, "label": "Textiles", "sector": "C13T15", "country": "ITA", "pagerank": 0.1276, "in_strength": 59.5, "out_strength": 23.8, "color": "#FFB74D", "size": 8.230626208013392, "top3": [{"country": "CN1", "flow": 4.7}, {"country": "FRA", "flow": 1.6}, {"country": "DEU", "flow": 1.2}], "is_ita": true}, {"id": "ITA_C28", "x": 0.0, "y": 0.7959183673469388, "label": "Machinery", "sector": "C28", "country": "ITA", "pagerank": 0.106, "in_strength": 105.2, "out_strength": 62.3, "color": "#FFB74D", "size": 7.852971884678807, "top3": [{"country": "DEU", "flow": 7.5}, {"country": "FRA", "flow": 4.8}, {"country": "CN1", "flow": 4.2}], "is_ita": true}, {"id": "ITA_C29", "x": 0.0, "y": 0.7551020408163265, "label": "Motor vehicles", "sector": "C29", "country": "ITA", "pagerank": 0.0817, "in_strength": 52.1, "out_strength": 25.7, "color": "#FFB74D", "size": 7.428697122979853, "top3": [{"country": "DEU", "flow": 5.5}, {"country": "FRA", "flow": 2.4}, {"country": "ESP", "flow": 1.6}], "is_ita": true}, {"id": "ITA_M", "x": 0.0, "y": 0.7142857142857143, "label": "Professional svc", "sector": "M", "country": "ITA", "pagerank": 0.073, "in_strength": 102.3, "out_strength": 172.0, "color": "#81C784", "size": 7.277183858031339, "top3": [{"country": "IRL", "flow": 2.2}, {"country": "CHE", "flow": 1.6}, {"country": "DEU", "flow": 1.4}], "is_ita": true}, {"id": "ITA_I", "x": 0.0, "y": 0.6734693877551021, "label": "Accommodation", "sector": "I", "country": "ITA", "pagerank": 0.0651, "in_strength": 43.2, "out_strength": 23.9, "color": "#F48FB1", "size": 7.138736581127023, "top3": [{"country": "DEU", "flow": 0.5}, {"country": "FRA", "flow": 0.5}, {"country": "ESP", "flow": 0.3}], "is_ita": true}, {"id": "ITA_D", "x": 0.0, "y": 0.6326530612244898, "label": "Electricity", "sector": "D", "country": "ITA", "pagerank": 0.0611, "in_strength": 120.6, "out_strength": 142.1, "color": "#CE93D8", "size": 7.068372733746322, "top3": [{"country": "ROW", "flow": 23.0}, {"country": "NOR", "flow": 3.9}, {"country": "RUS", "flow": 3.8}], "is_ita": true}, {"id": "ITA_C25", "x": 0.0, "y": 0.5918367346938775, "label": "Fab. metals", "sector": "C25", "country": "ITA", "pagerank": 0.0595, "in_strength": 75.6, "out_strength": 91.5, "color": "#FFB74D", "size": 7.04008718249958, "top3": [{"country": "FRA", "flow": 3.5}, {"country": "DEU", "flow": 3.4}, {"country": "CN1", "flow": 2.0}], "is_ita": true}, {"id": "ITA_C31T33", "x": 0.0, "y": 0.5510204081632653, "label": "Furniture", "sector": "C31T33", "country": "ITA", "pagerank": 0.0492, "in_strength": 47.2, "out_strength": 30.1, "color": "#FFB74D", "size": 6.8596208076334415, "top3": [{"country": "DEU", "flow": 1.6}, {"country": "FRA", "flow": 1.4}, {"country": "CN1", "flow": 1.4}], "is_ita": true}, {"id": "ITA_O", "x": 0.0, "y": 0.5102040816326531, "label": "Public admin", "sector": "O", "country": "ITA", "pagerank": 0.0468, "in_strength": 43.5, "out_strength": 16.7, "color": "#90A4AE", "size": 6.819240729990119, "top3": [{"country": "IRL", "flow": 0.3}, {"country": "LUX", "flow": 0.2}, {"country": "DEU", "flow": 0.2}], "is_ita": true}, {"id": "ITA_N", "x": 0.0, "y": 0.4693877551020408, "label": "Admin services", "sector": "N", "country": "ITA", "pagerank": 0.0433, "in_strength": 55.1, "out_strength": 101.9, "color": "#81C784", "size": 6.757995058416296, "top3": [{"country": "IRL", "flow": 2.2}, {"country": "GBR", "flow": 1.6}, {"country": "FRA", "flow": 1.0}], "is_ita": true}, {"id": "ITA_C20", "x": 0.0, "y": 0.4285714285714286, "label": "Chemicals", "sector": "C20", "country": "ITA", "pagerank": 0.0429, "in_strength": 52.7, "out_strength": 44.6, "color": "#FFB74D", "size": 6.74995711563727, "top3": [{"country": "DEU", "flow": 4.7}, {"country": "FRA", "flow": 3.3}, {"country": "ROW", "flow": 3.1}], "is_ita": true}, {"id": "ITA_K", "x": 0.0, "y": 0.3877551020408163, "label": "Finance", "sector": "K", "country": "ITA", "pagerank": 0.0398, "in_strength": 64.2, "out_strength": 107.5, "color": "#81C784", "size": 6.695750472726037, "top3": [{"country": "LUX", "flow": 4.8}, {"country": "IRL", "flow": 3.1}, {"country": "GBR", "flow": 0.9}], "is_ita": true}, {"id": "ITA_C24A", "x": 0.0, "y": 0.34693877551020413, "label": "Metals (ferrous)", "sector": "C24A", "country": "ITA", "pagerank": 0.0389, "in_strength": 50.8, "out_strength": 60.4, "color": "#FFB74D", "size": 6.680052391319958, "top3": [{"country": "DEU", "flow": 5.8}, {"country": "FRA", "flow": 4.0}, {"country": "POL", "flow": 1.9}], "is_ita": true}, {"id": "ITA_C27", "x": 0.0, "y": 0.30612244897959184, "label": "Electrical eq.", "sector": "C27", "country": "ITA", "pagerank": 0.0353, "in_strength": 34.6, "out_strength": 25.5, "color": "#FFB74D", "size": 6.616689823324913, "top3": [{"country": "DEU", "flow": 3.7}, {"country": "FRA", "flow": 2.1}, {"country": "CN1", "flow": 1.6}], "is_ita": true}, {"id": "ITA_C22", "x": 0.0, "y": 0.26530612244897955, "label": "Rubber & plastics", "sector": "C22", "country": "ITA", "pagerank": 0.0351, "in_strength": 42.9, "out_strength": 43.9, "color": "#FFB74D", "size": 6.613052676536255, "top3": [{"country": "DEU", "flow": 3.3}, {"country": "FRA", "flow": 2.7}, {"country": "ESP", "flow": 1.7}], "is_ita": true}, {"id": "ITA_A01", "x": 0.0, "y": 0.22448979591836737, "label": "Agriculture", "sector": "A01", "country": "ITA", "pagerank": 0.0349, "in_strength": 29.0, "out_strength": 32.8, "color": "#90A4AE", "size": 6.610503112937158, "top3": [{"country": "DEU", "flow": 1.6}, {"country": "FRA", "flow": 1.0}, {"country": "ESP", "flow": 0.6}], "is_ita": true}, {"id": "ITA_E", "x": 0.0, "y": 0.18367346938775508, "label": "Water & waste", "sector": "E", "country": "ITA", "pagerank": 0.0342, "in_strength": 35.2, "out_strength": 41.2, "color": "#CE93D8", "size": 6.5981642619726735, "top3": [{"country": "DEU", "flow": 0.1}, {"country": "LUX", "flow": 0.1}, {"country": "ROW", "flow": 0.1}], "is_ita": true}, {"id": "ITA_H52", "x": 0.0, "y": 0.1428571428571429, "label": "Warehousing", "sector": "H52", "country": "ITA", "pagerank": 0.0335, "in_strength": 49.6, "out_strength": 68.8, "color": "#F48FB1", "size": 6.586463927873313, "top3": [{"country": "DEU", "flow": 0.9}, {"country": "DNK", "flow": 0.9}, {"country": "FRA", "flow": 0.6}], "is_ita": true}, {"id": "ITA_H49", "x": 0.0, "y": 0.10204081632653061, "label": "Land transport", "sector": "H49", "country": "ITA", "pagerank": 0.0332, "in_strength": 46.7, "out_strength": 80.3, "color": "#F48FB1", "size": 6.581362329494924, "top3": [{"country": "SAU", "flow": 0.8}, {"country": "DEU", "flow": 0.6}, {"country": "RUS", "flow": 0.4}], "is_ita": true}, {"id": "ITA_L", "x": 0.0, "y": 0.061224489795918324, "label": "Real estate", "sector": "L", "country": "ITA", "pagerank": 0.0326, "in_strength": 35.8, "out_strength": 53.7, "color": "#81C784", "size": 6.569579490923619, "top3": [{"country": "LUX", "flow": 0.7}, {"country": "IRL", "flow": 0.2}, {"country": "FRA", "flow": 0.1}], "is_ita": true}, {"id": "ITA_C302T309", "x": 0.0, "y": 0.020408163265306145, "label": "Other transport", "sector": "C302T309", "country": "ITA", "pagerank": 0.0295, "in_strength": 14.5, "out_strength": 7.9, "color": "#FFB74D", "size": 6.516395432140652, "top3": [{"country": "FRA", "flow": 1.3}, {"country": "USA", "flow": 1.0}, {"country": "DEU", "flow": 0.8}], "is_ita": true}, {"id": "ITA_C24B", "x": 0.0, "y": -0.020408163265306145, "label": "Metals (non-fer.)", "sector": "C24B", "country": "ITA", "pagerank": 0.0291, "in_strength": 25.6, "out_strength": 26.6, "color": "#FFB74D", "size": 6.5080325436732, "top3": [{"country": "DEU", "flow": 4.8}, {"country": "FRA", "flow": 2.4}, {"country": "ESP", "flow": 1.5}], "is_ita": true}, {"id": "ITA_R", "x": 0.0, "y": -0.061224489795918435, "label": "Arts", "sector": "R", "country": "ITA", "pagerank": 0.0286, "in_strength": 22.4, "out_strength": 16.5, "color": "#90A4AE", "size": 6.50081812311964, "top3": [{"country": "LUX", "flow": 0.1}], "is_ita": true}, {"id": "ITA_J62_63", "x": 0.0, "y": -0.1020408163265305, "label": "J62", "sector": "J62", "country": "ITA", "pagerank": 0.0279, "in_strength": 35.4, "out_strength": 43.2, "color": "#90A4AE", "size": 6.4885776464780305, "top3": [{"country": "IRL", "flow": 2.1}, {"country": "DEU", "flow": 0.3}, {"country": "LUX", "flow": 0.3}], "is_ita": true}, {"id": "ITA_C17_18", "x": 0.0, "y": -0.1428571428571428, "label": "C17", "sector": "C17", "country": "ITA", "pagerank": 0.024, "in_strength": 27.6, "out_strength": 31.2, "color": "#FFB74D", "size": 6.418858908115839, "top3": [{"country": "FRA", "flow": 1.2}, {"country": "DEU", "flow": 1.1}, {"country": "ESP", "flow": 0.4}], "is_ita": true}, {"id": "ITA_C301", "x": 0.0, "y": -0.18367346938775508, "label": "Shipbuilding", "sector": "C301", "country": "ITA", "pagerank": 0.0214, "in_strength": 7.7, "out_strength": 3.4, "color": "#FFB74D", "size": 6.374790266000299, "top3": [{"country": "ROW", "flow": 0.3}, {"country": "FRA", "flow": 0.2}, {"country": "CN2", "flow": 0.2}], "is_ita": true}, {"id": "ITA_C19", "x": 0.0, "y": -0.22448979591836737, "label": "Petroleum", "sector": "C19", "country": "ITA", "pagerank": 0.0214, "in_strength": 60.7, "out_strength": 56.9, "color": "#FFB74D", "size": 6.373500990440079, "top3": [{"country": "ROW", "flow": 28.7}, {"country": "NOR", "flow": 4.7}, {"country": "RUS", "flow": 4.4}], "is_ita": true}, {"id": "ITA_S", "x": 0.0, "y": -0.26530612244897966, "label": "Other svc", "sector": "S", "country": "ITA", "pagerank": 0.0193, "in_strength": 16.0, "out_strength": 10.2, "color": "#90A4AE", "size": 6.3372829457778, "top3": [{"country": "DEU", "flow": 0.1}, {"country": "LUX", "flow": 0.1}], "is_ita": true}, {"id": "ITA_C23", "x": 0.0, "y": -0.30612244897959173, "label": "Non-metallic min.", "sector": "C23", "country": "ITA", "pagerank": 0.019, "in_strength": 24.7, "out_strength": 32.8, "color": "#FFB74D", "size": 6.332821452558273, "top3": [{"country": "FRA", "flow": 1.2}, {"country": "USA", "flow": 1.1}, {"country": "ROW", "flow": 0.9}], "is_ita": true}, {"id": "ITA_J61", "x": 0.0, "y": -0.346938775510204, "label": "Telecom", "sector": "J61", "country": "ITA", "pagerank": 0.018, "in_strength": 18.3, "out_strength": 17.9, "color": "#4FC3F7", "size": 6.314693523948485, "top3": [{"country": "IRL", "flow": 0.3}, {"country": "ROW", "flow": 0.2}, {"country": "CN2", "flow": 0.1}], "is_ita": true}, {"id": "ITA_J58T60", "x": 0.0, "y": -0.3877551020408163, "label": "Publishing", "sector": "J58T60", "country": "ITA", "pagerank": 0.0169, "in_strength": 15.0, "out_strength": 11.5, "color": "#4FC3F7", "size": 6.295623490280598, "top3": [{"country": "IRL", "flow": 0.5}, {"country": "GBR", "flow": 0.2}, {"country": "CHE", "flow": 0.1}], "is_ita": true}, {"id": "ITA_C26", "x": 0.0, "y": -0.4285714285714286, "label": "Electronics", "sector": "C26", "country": "ITA", "pagerank": 0.0163, "in_strength": 14.6, "out_strength": 8.2, "color": "#4FC3F7", "size": 6.285665807896376, "top3": [{"country": "DEU", "flow": 0.9}, {"country": "CN2", "flow": 0.9}, {"country": "CN1", "flow": 0.5}], "is_ita": true}, {"id": "ITA_C16", "x": 0.0, "y": -0.4693877551020409, "label": "Wood", "sector": "C16", "country": "ITA", "pagerank": 0.0158, "in_strength": 10.0, "out_strength": 12.2, "color": "#FFB74D", "size": 6.275468610867795, "top3": [{"country": "AUT", "flow": 0.3}, {"country": "FRA", "flow": 0.2}, {"country": "DEU", "flow": 0.1}], "is_ita": true}, {"id": "ITA_C21", "x": 0.0, "y": -0.510204081632653, "label": "Pharma", "sector": "C21", "country": "ITA", "pagerank": 0.0151, "in_strength": 15.9, "out_strength": 10.9, "color": "#FFB74D", "size": 6.264197313479435, "top3": [{"country": "CHE", "flow": 2.0}, {"country": "BEL", "flow": 1.5}, {"country": "CN1", "flow": 1.1}], "is_ita": true}, {"id": "ITA_P", "x": 0.0, "y": -0.5510204081632653, "label": "Education", "sector": "P", "country": "ITA", "pagerank": 0.0145, "in_strength": 10.7, "out_strength": 5.7, "color": "#90A4AE", "size": 6.253674162227433, "top3": [], "is_ita": true}, {"id": "ITA_H53", "x": 0.0, "y": -0.5918367346938775, "label": "Postal", "sector": "H53", "country": "ITA", "pagerank": 0.0082, "in_strength": 5.5, "out_strength": 8.7, "color": "#F48FB1", "size": 6.143014595042213, "top3": [{"country": "NLD", "flow": 0.2}, {"country": "DEU", "flow": 0.1}, {"country": "IRL", "flow": 0.1}], "is_ita": true}, {"id": "ITA_H50", "x": 0.0, "y": -0.6326530612244898, "label": "Water transport", "sector": "H50", "country": "ITA", "pagerank": 0.008, "in_strength": 5.7, "out_strength": 4.4, "color": "#F48FB1", "size": 6.139319741542266, "top3": [{"country": "GRC", "flow": 0.5}, {"country": "DEU", "flow": 0.4}, {"country": "ROW", "flow": 0.3}], "is_ita": true}, {"id": "ITA_B06", "x": 0.0, "y": -0.6734693877551021, "label": "Oil & gas", "sector": "B06", "country": "ITA", "pagerank": 0.0078, "in_strength": 6.2, "out_strength": 7.7, "color": "#90A4AE", "size": 6.135965240507819, "top3": [{"country": "ROW", "flow": 0.6}, {"country": "TUR", "flow": 0.3}, {"country": "ESP", "flow": 0.3}], "is_ita": true}, {"id": "ITA_H51", "x": 0.0, "y": -0.7142857142857142, "label": "Air transport", "sector": "H51", "country": "ITA", "pagerank": 0.0068, "in_strength": 4.3, "out_strength": 1.9, "color": "#F48FB1", "size": 6.119338877873841, "top3": [{"country": "SAU", "flow": 0.1}], "is_ita": true}, {"id": "ITA_B08", "x": 0.0, "y": -0.7551020408163265, "label": "Other mining", "sector": "B08", "country": "ITA", "pagerank": 0.0053, "in_strength": 1.4, "out_strength": 3.4, "color": "#90A4AE", "size": 6.0933832510217885, "top3": [{"country": "CN1", "flow": 0.2}], "is_ita": true}, {"id": "ITA_A02", "x": 0.0, "y": -0.7959183673469388, "label": "Forestry", "sector": "A02", "country": "ITA", "pagerank": 0.0049, "in_strength": 0.2, "out_strength": 1.7, "color": "#90A4AE", "size": 6.085701633956215, "top3": [], "is_ita": true}, {"id": "ITA_A03", "x": 0.0, "y": -0.8367346938775511, "label": "Fishing", "sector": "A03", "country": "ITA", "pagerank": 0.0049, "in_strength": 0.3, "out_strength": 0.2, "color": "#90A4AE", "size": 6.085065027955062, "top3": [], "is_ita": true}, {"id": "ITA_B05", "x": 0.0, "y": -0.8775510204081634, "label": "Coal mining", "sector": "B05", "country": "ITA", "pagerank": 0.0046, "in_strength": 0.0, "out_strength": 0.0, "color": "#90A4AE", "size": 6.080477757514451, "top3": [], "is_ita": true}, {"id": "ITA_B07", "x": 0.0, "y": -0.9183673469387754, "label": "Metal ores", "sector": "B07", "country": "ITA", "pagerank": 0.0046, "in_strength": 0.0, "out_strength": 0.0, "color": "#90A4AE", "size": 6.080477757514451, "top3": [], "is_ita": true}, {"id": "ITA_B09", "x": 0.0, "y": -0.9591836734693877, "label": "Mining support", "sector": "B09", "country": "ITA", "pagerank": 0.0046, "in_strength": 0.0, "out_strength": 0.0, "color": "#90A4AE", "size": 6.080477757514451, "top3": [], "is_ita": true}, {"id": "ITA_T", "x": 0.0, "y": -1.0, "label": "Households", "sector": "T", "country": "ITA", "pagerank": 0.0046, "in_strength": 0.0, "out_strength": 0.0, "color": "#90A4AE", "size": 6.080477757514451, "top3": [], "is_ita": true}, {"id": "DEU_C10T12", "x": -1.6, "y": 1.0, "label": "DEU_C10T12", "sector": "C10T12", "country": "DEU", "pagerank": 0.1971, "in_strength": 0, "out_strength": 0, "color": "#5C6BC0", "size": 13.848283745353458, "top3": [], "is_ita": false}, {"id": "DEU_C20", "x": -1.6, "y": 0.966, "label": "DEU_C20", "sector": "C20", "country": "DEU", "pagerank": 0.0792, "in_strength": 0, "out_strength": 0, "color": "#5C6BC0", "size": 7.959434064660929, "top3": [], "is_ita": false}, {"id": "DEU_C21", "x": -1.6, "y": 0.9319999999999999, "label": "DEU_C21", "sector": "C21", "country": "DEU", "pagerank": 0.0202, "in_strength": 0, "out_strength": 0, "color": "#5C6BC0", "size": 5.00796803412865, "top3": [], "is_ita": false}, {"id": "DEU_C24A", "x": -1.6, "y": 0.8979999999999999, "label": "DEU_C24A", "sector": "C24A", "country": "DEU", "pagerank": 0.0405, "in_strength": 0, "out_strength": 0, "color": "#5C6BC0", "size": 6.024805769452799, "top3": [], "is_ita": false}, {"id": "DEU_C24B", "x": -1.6, "y": 0.864, "label": "DEU_C24B", "sector": "C24B", "country": "DEU", "pagerank": 0.0487, "in_strength": 0, "out_strength": 0, "color": "#5C6BC0", "size": 6.433689604171957, "top3": [], "is_ita": false}, {"id": "DEU_C25", "x": -1.6, "y": 0.83, "label": "DEU_C25", "sector": "C25", "country": "DEU", "pagerank": 0.0699, "in_strength": 0, "out_strength": 0, "color": "#5C6BC0", "size": 7.4907101189354774, "top3": [], "is_ita": false}, {"id": "DEU_C27", "x": -1.6, "y": 0.7959999999999999, "label": "DEU_C27", "sector": "C27", "country": "DEU", "pagerank": 0.0807, "in_strength": 0, "out_strength": 0, "color": "#5C6BC0", "size": 8.034366555222112, "top3": [], "is_ita": false}, {"id": "DEU_C28", "x": -1.6, "y": 0.7619999999999999, "label": "DEU_C28", "sector": "C28", "country": "DEU", "pagerank": 0.1792, "in_strength": 0, "out_strength": 0, "color": "#5C6BC0", "size": 12.95340540083976, "top3": [], "is_ita": false}, {"id": "DEU_C29", "x": -1.6, "y": 0.728, "label": "DEU_C29", "sector": "C29", "country": "DEU", "pagerank": 0.5018, "in_strength": 0, "out_strength": 0, "color": "#5C6BC0", "size": 29.074346345333225, "top3": [], "is_ita": false}, {"id": "DEU_D", "x": -1.6, "y": 0.694, "label": "DEU_D", "sector": "D", "country": "DEU", "pagerank": 0.0693, "in_strength": 0, "out_strength": 0, "color": "#5C6BC0", "size": 7.46420547545193, "top3": [], "is_ita": false}, {"id": "DEU_G", "x": -1.6, "y": 0.6599999999999999, "label": "DEU_G", "sector": "G", "country": "DEU", "pagerank": 0.1798, "in_strength": 0, "out_strength": 0, "color": "#5C6BC0", "size": 12.984965322969513, "top3": [], "is_ita": false}, {"id": "FRA_A01", "x": -1.6, "y": 0.6, "label": "FRA_A01", "sector": "A01", "country": "FRA", "pagerank": 0.054, "in_strength": 0, "out_strength": 0, "color": "#26A69A", "size": 6.696191291005341, "top3": [], "is_ita": false}, {"id": "FRA_C20", "x": -1.6, "y": 0.5622222222222222, "label": "FRA_C20", "sector": "C20", "country": "FRA", "pagerank": 0.0321, "in_strength": 0, "out_strength": 0, "color": "#26A69A", "size": 5.6059480889841184, "top3": [], "is_ita": false}, {"id": "FRA_C24A", "x": -1.6, "y": 0.5244444444444444, "label": "FRA_C24A", "sector": "C24A", "country": "FRA", "pagerank": 0.0142, "in_strength": 0, "out_strength": 0, "color": "#26A69A", "size": 4.7092290535676415, "top3": [], "is_ita": false}, {"id": "FRA_C24B", "x": -1.6, "y": 0.48666666666666664, "label": "FRA_C24B", "sector": "C24B", "country": "FRA", "pagerank": 0.0094, "in_strength": 0, "out_strength": 0, "color": "#26A69A", "size": 4.467491791267689, "top3": [], "is_ita": false}, {"id": "FRA_C25", "x": -1.6, "y": 0.4488888888888889, "label": "FRA_C25", "sector": "C25", "country": "FRA", "pagerank": 0.0261, "in_strength": 0, "out_strength": 0, "color": "#26A69A", "size": 5.303994315903546, "top3": [], "is_ita": false}, {"id": "FRA_C28", "x": -1.6, "y": 0.4111111111111111, "label": "FRA_C28", "sector": "C28", "country": "FRA", "pagerank": 0.0225, "in_strength": 0, "out_strength": 0, "color": "#26A69A", "size": 5.124019462313447, "top3": [], "is_ita": false}, {"id": "FRA_C29", "x": -1.6, "y": 0.3733333333333333, "label": "FRA_C29", "sector": "C29", "country": "FRA", "pagerank": 0.1101, "in_strength": 0, "out_strength": 0, "color": "#26A69A", "size": 9.501219898107665, "top3": [], "is_ita": false}, {"id": "FRA_C302T309", "x": -1.6, "y": 0.33555555555555555, "label": "FRA_C302T309", "sector": "C302T309", "country": "FRA", "pagerank": 0.1167, "in_strength": 0, "out_strength": 0, "color": "#26A69A", "size": 9.832012040376728, "top3": [], "is_ita": false}, {"id": "FRA_F", "x": -1.6, "y": 0.29777777777777775, "label": "FRA_F", "sector": "F", "country": "FRA", "pagerank": 0.2393, "in_strength": 0, "out_strength": 0, "color": "#26A69A", "size": 15.95646757466494, "top3": [], "is_ita": false}, {"id": "FRA_G", "x": -1.6, "y": 0.25999999999999995, "label": "FRA_G", "sector": "G", "country": "FRA", "pagerank": 0.1553, "in_strength": 0, "out_strength": 0, "color": "#26A69A", "size": 11.757668532778862, "top3": [], "is_ita": false}, {"id": "CN1_C13T15", "x": -1.6, "y": 0.19999999999999996, "label": "CN1_C13T15", "sector": "C13T15", "country": "CN1", "pagerank": 0.2558, "in_strength": 0, "out_strength": 0, "color": "#66BB6A", "size": 16.78284162512037, "top3": [], "is_ita": false}, {"id": "CN1_C20", "x": -1.6, "y": 0.13199999999999995, "label": "CN1_C20", "sector": "C20", "country": "CN1", "pagerank": 0.2221, "in_strength": 0, "out_strength": 0, "color": "#66BB6A", "size": 15.099216447370745, "top3": [], "is_ita": false}, {"id": "CN1_C23", "x": -1.6, "y": 0.06399999999999995, "label": "CN1_C23", "sector": "C23", "country": "CN1", "pagerank": 0.1349, "in_strength": 0, "out_strength": 0, "color": "#66BB6A", "size": 10.739283434003518, "top3": [], "is_ita": false}, {"id": "CN1_C24A", "x": -1.6, "y": -0.004000000000000059, "label": "CN1_C24A", "sector": "C24A", "country": "CN1", "pagerank": 0.2047, "in_strength": 0, "out_strength": 0, "color": "#66BB6A", "size": 14.227158516371755, "top3": [], "is_ita": false}, {"id": "CN1_C27", "x": -1.6, "y": -0.07200000000000006, "label": "CN1_C27", "sector": "C27", "country": "CN1", "pagerank": 0.2059, "in_strength": 0, "out_strength": 0, "color": "#66BB6A", "size": 14.289608621078143, "top3": [], "is_ita": false}, {"id": "CN1_C28", "x": -1.6, "y": -0.14000000000000007, "label": "CN1_C28", "sector": "C28", "country": "CN1", "pagerank": 0.2833, "in_strength": 0, "out_strength": 0, "color": "#66BB6A", "size": 18.154161958259635, "top3": [], "is_ita": false}, {"id": "USA_B06", "x": -1.6, "y": -0.20000000000000018, "label": "USA_B06", "sector": "B06", "country": "USA", "pagerank": 0.0748, "in_strength": 0, "out_strength": 0, "color": "#FFA726", "size": 7.734845822744173, "top3": [], "is_ita": false}, {"id": "USA_C24B", "x": -1.6, "y": -0.2850000000000002, "label": "USA_C24B", "sector": "C24B", "country": "USA", "pagerank": 0.032, "in_strength": 0, "out_strength": 0, "color": "#FFA726", "size": 5.601221110019151, "top3": [], "is_ita": false}, {"id": "USA_C302T309", "x": -1.6, "y": -0.3700000000000002, "label": "USA_C302T309", "sector": "C302T309", "country": "USA", "pagerank": 0.129, "in_strength": 0, "out_strength": 0, "color": "#FFA726", "size": 10.447593045918241, "top3": [], "is_ita": false}, {"id": "USA_F", "x": -1.6, "y": -0.45500000000000024, "label": "USA_F", "sector": "F", "country": "USA", "pagerank": 0.333, "in_strength": 0, "out_strength": 0, "color": "#FFA726", "size": 20.639121002597204, "top3": [], "is_ita": false}, {"id": "USA_Q", "x": -1.6, "y": -0.5400000000000003, "label": "USA_Q", "sector": "Q", "country": "USA", "pagerank": 1.019, "in_strength": 0, "out_strength": 0, "color": "#FFA726", "size": 54.91240539963306, "top3": [], "is_ita": false}, {"id": "ESP_C10T12", "x": -1.6, "y": -0.6000000000000001, "label": "ESP_C10T12", "sector": "C10T12", "country": "ESP", "pagerank": 0.2022, "in_strength": 0, "out_strength": 0, "color": "#EF5350", "size": 14.105179030288745, "top3": [], "is_ita": false}, {"id": "ESP_C20", "x": -1.6, "y": -0.7133333333333335, "label": "ESP_C20", "sector": "C20", "country": "ESP", "pagerank": 0.0387, "in_strength": 0, "out_strength": 0, "color": "#EF5350", "size": 5.932134023735166, "top3": [], "is_ita": false}, {"id": "ESP_C24B", "x": -1.6, "y": -0.8266666666666668, "label": "ESP_C24B", "sector": "C24B", "country": "ESP", "pagerank": 0.0164, "in_strength": 0, "out_strength": 0, "color": "#EF5350", "size": 4.821047521464472, "top3": [], "is_ita": false}, {"id": "ESP_C29", "x": -1.6, "y": -0.9400000000000002, "label": "ESP_C29", "sector": "C29", "country": "ESP", "pagerank": 0.0931, "in_strength": 0, "out_strength": 0, "color": "#EF5350", "size": 8.650340468033978, "top3": [], "is_ita": false}, {"id": "IRL_C21", "x": 1.6, "y": 1.0, "label": "IRL_C21", "sector": "C21", "country": "IRL", "pagerank": 0.0572, "in_strength": 0, "out_strength": 0, "color": "#8D6E63", "size": 6.857877081878055, "top3": [], "is_ita": false}, {"id": "IRL_J62_63", "x": 1.6, "y": 0.83, "label": "IRL_J62_63", "sector": "J62", "country": "IRL", "pagerank": 0.0711, "in_strength": 0, "out_strength": 0, "color": "#8D6E63", "size": 7.551781922678421, "top3": [], "is_ita": false}, {"id": "IRL_K", "x": 1.6, "y": 0.6599999999999999, "label": "IRL_K", "sector": "K", "country": "IRL", "pagerank": 0.0235, "in_strength": 0, "out_strength": 0, "color": "#8D6E63", "size": 5.171705701385774, "top3": [], "is_ita": false}, {"id": "RUS_B06", "x": 1.6, "y": 0.6, "label": "RUS_B06", "sector": "B06", "country": "RUS", "pagerank": 0.0121, "in_strength": 0, "out_strength": 0, "color": "#78909C", "size": 4.60257347383881, "top3": [], "is_ita": false}, {"id": "RUS_C19", "x": 1.6, "y": 0.25999999999999995, "label": "RUS_C19", "sector": "C19", "country": "RUS", "pagerank": 0.0536, "in_strength": 0, "out_strength": 0, "color": "#78909C", "size": 6.679675461328232, "top3": [], "is_ita": false}, {"id": "CHE_C21", "x": 1.6, "y": 0.19999999999999996, "label": "CHE_C21", "sector": "C21", "country": "CHE", "pagerank": 0.1025, "in_strength": 0, "out_strength": 0, "color": "#AB47BC", "size": 9.123080401114194, "top3": [], "is_ita": false}, {"id": "GBR_K", "x": 1.6, "y": -0.20000000000000018, "label": "GBR_K", "sector": "K", "country": "GBR", "pagerank": 0.0996, "in_strength": 0, "out_strength": 0, "color": "#42A5F5", "size": 8.974012671752376, "top3": [], "is_ita": false}, {"id": "POL_C25", "x": 1.6, "y": -0.6000000000000001, "label": "POL_C25", "sector": "C25", "country": "POL", "pagerank": 0.0369, "in_strength": 0, "out_strength": 0, "color": "#EC407A", "size": 5.841955891357348, "top3": [], "is_ita": false}], "edges": [{"source": "CHE_C21", "target": "ITA_Q", "weight": 0.55, "color": "#90A4AE", "alpha": 0.1886852725652554, "width": 0.8815848475847523, "country": "CHE"}, {"source": "DEU_C10T12", "target": "ITA_C10T12", "weight": 0.69, "color": "#FFB74D", "alpha": 0.20587519794761205, "width": 0.9770844330422893, "country": "DEU"}, {"source": "DEU_C20", "target": "ITA_C20", "weight": 1.6, "color": "#FFB74D", "alpha": 0.3188605999180846, "width": 1.6047811106560255, "country": "DEU"}, {"source": "DEU_C20", "target": "ITA_C22", "weight": 1.25, "color": "#FFB74D", "alpha": 0.2748352469556452, "width": 1.360195816420251, "country": "DEU"}, {"source": "DEU_C21", "target": "ITA_Q", "weight": 0.59, "color": "#90A4AE", "alpha": 0.19309737339848906, "width": 0.9060965188804948, "country": "DEU"}, {"source": "DEU_C24B", "target": "ITA_C24B", "weight": 0.83, "color": "#FFB74D", "alpha": 0.22281163535843082, "width": 1.0711757519912823, "country": "DEU"}, {"source": "DEU_C27", "target": "ITA_C27", "weight": 0.98, "color": "#FFB74D", "alpha": 0.2413823570529154, "width": 1.1743464280717522, "country": "DEU"}, {"source": "DEU_C27", "target": "ITA_C28", "weight": 0.52, "color": "#FFB74D", "alpha": 0.18417894386894235, "width": 0.8565496881607909, "country": "DEU"}, {"source": "DEU_C27", "target": "ITA_F", "weight": 0.6, "color": "#CE93D8", "alpha": 0.1939001659935271, "width": 0.9105564777418171, "country": "DEU"}, {"source": "DEU_C28", "target": "ITA_C28", "weight": 2.24, "color": "#FFB74D", "alpha": 0.3984796188989876, "width": 2.0471089938832643, "country": "DEU"}, {"source": "DEU_C29", "target": "ITA_C29", "weight": 2.33, "color": "#FFB74D", "alpha": 0.40925262804694784, "width": 2.1069590447052655, "country": "DEU"}, {"source": "DEU_C29", "target": "ITA_G", "weight": 0.8, "color": "#F48FB1", "alpha": 0.21873550756459997, "width": 1.048530597581111, "country": "DEU"}, {"source": "DEU_D", "target": "ITA_D", "weight": 0.69, "color": "#CE93D8", "alpha": 0.2061365185869939, "width": 0.9785362143721883, "country": "DEU"}, {"source": "DEU_G", "target": "ITA_C28", "weight": 0.76, "color": "#FFB74D", "alpha": 0.21474345371578785, "width": 1.0263525206432658, "country": "DEU"}, {"source": "ESP_C10T12", "target": "ITA_C10T12", "weight": 0.61, "color": "#FFB74D", "alpha": 0.19522911277541088, "width": 0.9179395154189494, "country": "ESP"}, {"source": "ESP_C20", "target": "ITA_C20", "weight": 0.86, "color": "#FFB74D", "alpha": 0.22626236620881995, "width": 1.0903464789378887, "country": "ESP"}, {"source": "ESP_C20", "target": "ITA_C22", "weight": 0.66, "color": "#FFB74D", "alpha": 0.20211024181386217, "width": 0.956168010077012, "country": "ESP"}, {"source": "ESP_C24B", "target": "ITA_C24B", "weight": 0.56, "color": "#FFB74D", "alpha": 0.18906960705302567, "width": 0.8837200391834761, "country": "ESP"}, {"source": "ESP_C29", "target": "ITA_C29", "weight": 0.84, "color": "#FFB74D", "alpha": 0.22376265281357044, "width": 1.0764591822976135, "country": "ESP"}, {"source": "FRA_A01", "target": "ITA_C10T12", "weight": 0.95, "color": "#FFB74D", "alpha": 0.2378307325032627, "width": 1.1546151805736817, "country": "FRA"}, {"source": "FRA_C20", "target": "ITA_C20", "weight": 1.08, "color": "#FFB74D", "alpha": 0.2542768399418118, "width": 1.2459824441211766, "country": "FRA"}, {"source": "FRA_C20", "target": "ITA_C22", "weight": 0.84, "color": "#FFB74D", "alpha": 0.2241210439165645, "width": 1.078450243980914, "country": "FRA"}, {"source": "FRA_C24A", "target": "ITA_C24A", "weight": 0.77, "color": "#FFB74D", "alpha": 0.21587976155588146, "width": 1.0326653419771192, "country": "FRA"}, {"source": "FRA_C24A", "target": "ITA_C25", "weight": 0.78, "color": "#FFB74D", "alpha": 0.21737882991114205, "width": 1.0409934995063446, "country": "FRA"}, {"source": "FRA_C24B", "target": "ITA_C24B", "weight": 0.66, "color": "#FFB74D", "alpha": 0.20197303978901476, "width": 0.9554057766056376, "country": "FRA"}, {"source": "FRA_C28", "target": "ITA_C28", "weight": 0.77, "color": "#FFB74D", "alpha": 0.21548677513548486, "width": 1.0304820840860272, "country": "FRA"}, {"source": "FRA_C29", "target": "ITA_C29", "weight": 0.67, "color": "#FFB74D", "alpha": 0.20293172854166236, "width": 0.9607318252314574, "country": "FRA"}, {"source": "FRA_G", "target": "ITA_C10T12", "weight": 0.54, "color": "#FFB74D", "alpha": 0.1870944093150571, "width": 0.872746718416984, "country": "FRA"}, {"source": "GBR_K", "target": "ITA_K", "weight": 0.68, "color": "#81C784", "alpha": 0.2040032275722266, "width": 0.9666845976234812, "country": "GBR"}, {"source": "IRL_C21", "target": "ITA_Q", "weight": 0.87, "color": "#90A4AE", "alpha": 0.22756388003359593, "width": 1.0975771112977553, "country": "IRL"}, {"source": "IRL_J62_63", "target": "ITA_J62_63", "weight": 1.27, "color": "#90A4AE", "alpha": 0.2780354813922624, "width": 1.3779748966236802, "country": "IRL"}, {"source": "IRL_K", "target": "ITA_K", "weight": 1.7, "color": "#81C784", "alpha": 0.3308570817137453, "width": 1.6714282317430293, "country": "IRL"}, {"source": "ITA_A01", "target": "DEU_C10T12", "weight": 0.8, "color": "#90A4AE", "alpha": 0.2197111526156228, "width": 1.0539508478645712, "country": "DEU"}, {"source": "ITA_C13T15", "target": "CN1_C13T15", "weight": 1.78, "color": "#FFB74D", "alpha": 0.3407268141997951, "width": 1.7262600788877507, "country": "CN1"}, {"source": "ITA_C20", "target": "DEU_C20", "weight": 1.08, "color": "#FFB74D", "alpha": 0.2539876270605199, "width": 1.2443757058917773, "country": "DEU"}, {"source": "ITA_C20", "target": "ESP_C20", "weight": 0.67, "color": "#FFB74D", "alpha": 0.20303246087058993, "width": 0.9612914492810551, "country": "ESP"}, {"source": "ITA_C20", "target": "FRA_C20", "weight": 0.7, "color": "#FFB74D", "alpha": 0.20629183132877355, "width": 0.9793990629376308, "country": "FRA"}, {"source": "ITA_C20", "target": "CN1_C20", "weight": 0.62, "color": "#FFB74D", "alpha": 0.19641327312665868, "width": 0.9245181840369927, "country": "CN1"}, {"source": "ITA_C21", "target": "CHE_C21", "weight": 1.38, "color": "#FFB74D", "alpha": 0.29149109859159283, "width": 1.452728325508849, "country": "CHE"}, {"source": "ITA_C21", "target": "USA_Q", "weight": 0.69, "color": "#FFB74D", "alpha": 0.20608502903672998, "width": 0.9782501613151666, "country": "USA"}, {"source": "ITA_C23", "target": "FRA_F", "weight": 0.88, "color": "#FFB74D", "alpha": 0.22895463165414026, "width": 1.1053035091896684, "country": "FRA"}, {"source": "ITA_C23", "target": "USA_F", "weight": 0.8, "color": "#FFB74D", "alpha": 0.21988132384141065, "width": 1.0548962435633924, "country": "USA"}, {"source": "ITA_C24A", "target": "DEU_C24A", "weight": 1.09, "color": "#FFB74D", "alpha": 0.25468855773427884, "width": 1.248269765190438, "country": "DEU"}, {"source": "ITA_C24A", "target": "DEU_C25", "weight": 1.19, "color": "#FFB74D", "alpha": 0.2673123605043096, "width": 1.31840200280172, "country": "DEU"}, {"source": "ITA_C24A", "target": "DEU_C28", "weight": 1.02, "color": "#FFB74D", "alpha": 0.2462666150759726, "width": 1.2014811948665145, "country": "DEU"}, {"source": "ITA_C24A", "target": "DEU_C29", "weight": 0.89, "color": "#FFB74D", "alpha": 0.23087434282275504, "width": 1.115968571237528, "country": "DEU"}, {"source": "ITA_C24A", "target": "FRA_C25", "weight": 0.71, "color": "#FFB74D", "alpha": 0.20862041768932243, "width": 0.9923356538295691, "country": "FRA"}, {"source": "ITA_C24A", "target": "FRA_F", "weight": 0.7, "color": "#FFB74D", "alpha": 0.20704368055006928, "width": 0.9835760030559404, "country": "FRA"}, {"source": "ITA_C24A", "target": "POL_C25", "weight": 0.65, "color": "#FFB74D", "alpha": 0.2000810967312825, "width": 0.9448949818404582, "country": "POL"}, {"source": "ITA_C24B", "target": "DEU_C24B", "weight": 1.18, "color": "#FFB74D", "alpha": 0.2665056329556955, "width": 1.3139201830871972, "country": "DEU"}, {"source": "ITA_C24B", "target": "DEU_C25", "weight": 0.61, "color": "#FFB74D", "alpha": 0.1960443681256237, "width": 0.9224687118090205, "country": "DEU"}, {"source": "ITA_C24B", "target": "DEU_C29", "weight": 0.54, "color": "#FFB74D", "alpha": 0.18650092645882094, "width": 0.8694495914378941, "country": "DEU"}, {"source": "ITA_C25", "target": "FRA_F", "weight": 0.71, "color": "#FFB74D", "alpha": 0.20807658724414113, "width": 0.9893143735785619, "country": "FRA"}, {"source": "ITA_C28", "target": "DEU_C28", "weight": 1.15, "color": "#FFB74D", "alpha": 0.2632358479042931, "width": 1.295754710579406, "country": "DEU"}, {"source": "ITA_C28", "target": "CN1_C28", "weight": 0.73, "color": "#FFB74D", "alpha": 0.21046238559532798, "width": 1.0025688088629332, "country": "CN1"}, {"source": "ITA_C29", "target": "DEU_C29", "weight": 1.51, "color": "#FFB74D", "alpha": 0.30730239995480524, "width": 1.540568888637807, "country": "DEU"}, {"source": "ITA_C29", "target": "FRA_C29", "weight": 0.68, "color": "#FFB74D", "alpha": 0.2044179369224597, "width": 0.9689885384581094, "country": "FRA"}, {"source": "ITA_C302T309", "target": "FRA_C302T309", "weight": 0.94, "color": "#FFB74D", "alpha": 0.23652918143917845, "width": 1.1473843413287692, "country": "FRA"}, {"source": "ITA_C302T309", "target": "USA_C302T309", "weight": 0.52, "color": "#FFB74D", "alpha": 0.18411128004577731, "width": 0.8561737780320962, "country": "USA"}, {"source": "ITA_G", "target": "CHE_C21", "weight": 0.66, "color": "#F48FB1", "alpha": 0.20169820128072324, "width": 0.9538788960040181, "country": "CHE"}, {"source": "ITA_G", "target": "DEU_C29", "weight": 0.73, "color": "#F48FB1", "alpha": 0.2111102999071831, "width": 1.0061683328176838, "country": "DEU"}, {"source": "ITA_G", "target": "FRA_F", "weight": 0.69, "color": "#F48FB1", "alpha": 0.20505727378030508, "width": 0.9725404098905839, "country": "FRA"}, {"source": "ITA_G", "target": "CN1_C13T15", "weight": 0.69, "color": "#F48FB1", "alpha": 0.20604317205421074, "width": 0.978017622523393, "country": "CN1"}, {"source": "ITA_J62_63", "target": "IRL_J62_63", "weight": 0.72, "color": "#90A4AE", "alpha": 0.20978929751106806, "width": 0.9988294306170449, "country": "IRL"}, {"source": "ITA_K", "target": "IRL_K", "weight": 0.73, "color": "#81C784", "alpha": 0.2111935670005221, "width": 1.0066309277806784, "country": "IRL"}, {"source": "ITA_N", "target": "IRL_J62_63", "weight": 0.62, "color": "#81C784", "alpha": 0.1966095615206614, "width": 0.9256086751147854, "country": "IRL"}, {"source": "RUS_B06", "target": "ITA_C19", "weight": 3.63, "color": "#FFB74D", "alpha": 0.5700000000000001, "width": 3.0, "country": "RUS"}, {"source": "RUS_B06", "target": "ITA_D", "weight": 2.98, "color": "#CE93D8", "alpha": 0.4898560184901165, "width": 2.554755658278425, "country": "RUS"}, {"source": "RUS_C19", "target": "ITA_C19", "weight": 0.68, "color": "#FFB74D", "alpha": 0.20498556328563905, "width": 0.9721420182535504, "country": "RUS"}, {"source": "RUS_C19", "target": "ITA_D", "weight": 0.61, "color": "#CE93D8", "alpha": 0.19581097696746025, "width": 0.9211720942636681, "country": "RUS"}, {"source": "USA_B06", "target": "ITA_C19", "weight": 2.52, "color": "#FFB74D", "alpha": 0.4325403287916457, "width": 2.2363351599535872, "country": "USA"}, {"source": "USA_B06", "target": "ITA_D", "weight": 2.07, "color": "#CE93D8", "alpha": 0.3765271335530692, "width": 1.9251507419614957, "country": "USA"}, {"source": "USA_C24B", "target": "ITA_C24B", "weight": 0.7, "color": "#FFB74D", "alpha": 0.20649524484376264, "width": 0.9805291380209035, "country": "USA"}, {"source": "CN1_C13T15", "target": "ITA_C13T15", "weight": 1.65, "color": "#FFB74D", "alpha": 0.32515401819308476, "width": 1.6397445455171378, "country": "CN1"}, {"source": "CN1_C20", "target": "ITA_C20", "weight": 0.88, "color": "#FFB74D", "alpha": 0.22977141381599303, "width": 1.1098411878666279, "country": "CN1"}, {"source": "CN1_C20", "target": "ITA_C22", "weight": 0.69, "color": "#FFB74D", "alpha": 0.20510922261537123, "width": 0.9728290145298403, "country": "CN1"}, {"source": "CN1_C23", "target": "ITA_F", "weight": 0.6, "color": "#CE93D8", "alpha": 0.1939681153180557, "width": 0.9109339739891982, "country": "CN1"}, {"source": "CN1_C24A", "target": "ITA_C24A", "weight": 0.8, "color": "#FFB74D", "alpha": 0.21897808441880862, "width": 1.049878246771159, "country": "CN1"}, {"source": "CN1_C24A", "target": "ITA_C25", "weight": 0.81, "color": "#FFB74D", "alpha": 0.2205254893962311, "width": 1.0584749410901728, "country": "CN1"}, {"source": "CN1_C24A", "target": "ITA_C28", "weight": 0.52, "color": "#FFB74D", "alpha": 0.1842263867477053, "width": 0.8568132597094739, "country": "CN1"}, {"source": "CN1_C27", "target": "ITA_C27", "weight": 0.7, "color": "#FFB74D", "alpha": 0.20740861335821986, "width": 0.9856034075456659, "country": "CN1"}, {"source": "CN1_C28", "target": "ITA_C28", "weight": 1.01, "color": "#FFB74D", "alpha": 0.24559749918459708, "width": 1.1977638843588727, "country": "CN1"}], "country_labels": [{"country": "DEU", "x": -1.6, "y": 0.83, "color": "#5C6BC0", "align": "right"}, {"country": "FRA", "x": -1.6, "y": 0.43, "color": "#26A69A", "align": "right"}, {"country": "CN1", "x": -1.6, "y": 0.029999999999999943, "color": "#66BB6A", "align": "right"}, {"country": "USA", "x": -1.6, "y": -0.3700000000000002, "color": "#FFA726", "align": "right"}, {"country": "ESP", "x": -1.6, "y": -0.77, "color": "#EF5350", "align": "right"}, {"country": "IRL", "x": 1.6, "y": 0.8300000000000001, "color": "#8D6E63", "align": "left"}, {"country": "RUS", "x": 1.6, "y": 0.42999999999999994, "color": "#78909C", "align": "left"}, {"country": "CHE", "x": 1.6, "y": 0.19999999999999996, "color": "#AB47BC", "align": "left"}, {"country": "GBR", "x": 1.6, "y": -0.20000000000000018, "color": "#42A5F5", "align": "left"}, {"country": "POL", "x": 1.6, "y": -0.6000000000000001, "color": "#EC407A", "align": "left"}], "top10": ["DEU", "FRA", "CN1", "USA", "ESP", "IRL", "RUS", "CHE", "GBR", "POL"]};
+
+const svg = d3.select("#svg");
+const tooltip = document.getElementById("tooltip");
+const filterIndicator = document.getElementById("filter-indicator");
+
+// ── Layout ──────────────────────────────────────────────────────────────────
+const W = window.innerWidth, H = window.innerHeight;
+const PAD = { left: 180, right: 180, top: 60, bottom: 40 };
+
+// Map data coords [-1.6, 1.6] x [-1, 1] → screen
+const xScale = d3.scaleLinear().domain([-2.0, 2.0]).range([PAD.left, W - PAD.right]);
+const yScale = d3.scaleLinear().domain([-1.15, 1.15]).range([H - PAD.bottom, PAD.top]);
+
+function px(node) { return { x: xScale(node.x), y: yScale(node.y) }; }
+
+// Index nodes by id
+const nodeMap = {};
+RAW.nodes.forEach(n => { nodeMap[n.id] = n; });
+
+// State
+let activeCountry = null;
+let hoveredNode   = null;
+
+// ── Main group ───────────────────────────────────────────────────────────────
+const g = svg.append("g").attr("id", "main");
+
+// Title
+svg.append("text")
+  .attr("x", W / 2).attr("y", 28)
+  .attr("text-anchor", "middle")
+  .attr("font-size", 15).attr("font-weight", "700").attr("fill", "white")
+  .text("Italy in the Global Supply Network — OECD ICIO 2022");
+
+svg.append("text")
+  .attr("x", W / 2).attr("y", 46)
+  .attr("text-anchor", "middle")
+  .attr("font-size", 11).attr("fill", "#666")
+  .text("Centre: Italian sectors sorted by PageRank  ·  Sides: top 10 trading partners  ·  Arcs: top 5% flows");
+
+// ── Draw arcs ────────────────────────────────────────────────────────────────
+function bezierPath(src, tgt) {
+  const p0 = px(nodeMap[src]);
+  const p1 = px(nodeMap[tgt]);
+  const cx  = (p0.x + p1.x) / 2;
+  const bulge = Math.abs(p1.x - p0.x) * 0.55;
+  const dir = (p0.x < W/2 || p1.x < W/2) ? -1 : 1;
+  const cpx = cx + dir * bulge;
+  const cpy = (p0.y + p1.y) / 2;
+  return `M${p0.x},${p0.y} Q${cpx},${cpy} ${p1.x},${p1.y}`;
+}
+
+const arcGroup = g.append("g").attr("id", "arcs");
+
+const arcs = arcGroup.selectAll(".arc")
+  .data(RAW.edges)
+  .enter().append("path")
+  .attr("class", d => `arc arc-country-${d.country}`)
+  .attr("d", d => bezierPath(d.source, d.target))
+  .attr("fill", "none")
+  .attr("stroke", d => d.color)
+  .attr("stroke-width", d => d.width)
+  .attr("stroke-opacity", d => d.alpha)
+  .attr("data-source", d => d.source)
+  .attr("data-target", d => d.target)
+  .attr("data-country", d => d.country);
+
+// ── Draw foreign nodes ────────────────────────────────────────────────────────
+const foreignGroup = g.append("g").attr("id", "foreign-nodes");
+
+foreignGroup.selectAll(".node-foreign")
+  .data(RAW.nodes.filter(n => !n.is_ita))
+  .enter().append("circle")
+  .attr("class", "node-foreign")
+  .attr("cx", d => px(d).x)
+  .attr("cy", d => px(d).y)
+  .attr("r",  d => Math.sqrt(d.size) * 0.9)
+  .attr("fill", d => d.color)
+  .attr("stroke", "#888")
+  .attr("stroke-width", 0.3)
+  .attr("opacity", 0.75);
+
+// ── Draw Italian nodes ────────────────────────────────────────────────────────
+const itaGroup = g.append("g").attr("id", "ita-nodes");
+
+const itaNodes = itaGroup.selectAll(".node-ita")
+  .data(RAW.nodes.filter(n => n.is_ita))
+  .enter().append("g")
+  .attr("class", "node-ita")
+  .attr("transform", d => `translate(${px(d).x},${px(d).y})`);
+
+itaNodes.append("circle")
+  .attr("r", d => Math.sqrt(d.size) * 1.4)
+  .attr("fill", d => d.color)
+  .attr("stroke", "white")
+  .attr("stroke-width", 0.6);
+
+// ── Italian labels (alternating) ─────────────────────────────────────────────
+const labelGroup = g.append("g").attr("id", "ita-labels");
+
+RAW.nodes.filter(n => n.is_ita).forEach((n, i) => {
+  const { x, y } = px(n);
+  const right = i % 2 === 0;
+  labelGroup.append("text")
+    .attr("class", "label-ita")
+    .attr("x", x + (right ? 10 : -10))
+    .attr("y", y)
+    .attr("dy", "0.35em")
+    .attr("text-anchor", right ? "start" : "end")
+    .text(n.label);
+});
+
+// ── Country labels ────────────────────────────────────────────────────────────
+const countryLabelGroup = g.append("g").attr("id", "country-labels");
+
+RAW.country_labels.forEach(cl => {
+  countryLabelGroup.append("text")
+    .attr("class", `label-country label-country-${cl.country}`)
+    .attr("x", xScale(cl.x) + (cl.align === "right" ? -14 : 14))
+    .attr("y", yScale(cl.y))
+    .attr("dy", "0.35em")
+    .attr("text-anchor", cl.align === "right" ? "end" : "start")
+    .attr("fill", cl.color)
+    .text(cl.country)
+    .on("click", function() { handleCountryClick(cl.country); });
+});
+
+// ── Interactions ──────────────────────────────────────────────────────────────
+
+function getConnectedIds(nodeId) {
+  const ids = new Set();
+  RAW.edges.forEach(e => {
+    if (e.source === nodeId) ids.add(e.target);
+    if (e.target === nodeId) ids.add(e.source);
+  });
+  return ids;
+}
+
+function applyHover(nodeId) {
+  hoveredNode = nodeId;
+  const connected = getConnectedIds(nodeId);
+
+  // Filter arcs by both hover and active country
+  arcs.each(function(d) {
+    const el = d3.select(this);
+    const isConnected = d.source === nodeId || d.target === nodeId;
+    const countryOk   = !activeCountry || d.country === activeCountry;
+
+    if (!isConnected) {
+      el.classed("dimmed", true).classed("highlighted", false);
+    } else if (countryOk) {
+      el.classed("dimmed", false).classed("highlighted", true)
+        .raise();
+    } else {
+      el.classed("dimmed", true).classed("highlighted", false);
+    }
+  });
+}
+
+function clearHover() {
+  hoveredNode = null;
+  applyCountryFilter(activeCountry);  // revert to country filter state
+}
+
+function applyCountryFilter(country) {
+  activeCountry = country;
+  arcs.each(function(d) {
+    const el = d3.select(this);
+    if (!country) {
+      el.classed("dimmed", false).classed("highlighted", false)
+        .attr("stroke-opacity", d.alpha);
+    } else {
+      const match = d.country === country;
+      el.classed("dimmed", !match).classed("highlighted", false)
+        .attr("stroke-opacity", match ? Math.min(d.alpha * 1.8, 0.9) : d.alpha * 0.05);
+    }
+  });
+}
+
+function handleCountryClick(country) {
+  if (activeCountry === country) {
+    // Toggle off
+    activeCountry = null;
+    applyCountryFilter(null);
+    filterIndicator.classList.remove("visible");
+    d3.selectAll(".label-country").classed("active", false);
+  } else {
+    activeCountry = country;
+    applyCountryFilter(country);
+    filterIndicator.textContent = `Showing flows with ${country} — click again to clear`;
+    filterIndicator.classList.add("visible");
+    d3.selectAll(".label-country").classed("active", false);
+    d3.selectAll(`.label-country-${country}`).classed("active", true);
+  }
+}
+
+// Node hover → tooltip
+itaNodes
+  .on("mousemove", function(event, d) {
+    applyHover(d.id);
+
+    // Build tooltip
+    const p3 = d.top3.map(p =>
+      `<div class="partner-row"><span>${p.country}</span><span style="color:white">$${p.flow}B</span></div>`
+    ).join("");
+
+    tooltip.innerHTML = `
+      <div class="sector-name" style="color:${d.color}">${d.label}</div>
+      <div class="stat"><span>PageRank</span><span>${d.pagerank.toFixed(3)}%</span></div>
+      <div class="stat"><span>In-flow</span><span>$${d.in_strength}B</span></div>
+      <div class="stat"><span>Out-flow</span><span>$${d.out_strength}B</span></div>
+      ${d.top3.length ? `<div class="partners-title">Top trading partners</div>${p3}` : ""}
+    `;
+
+    const tx = event.clientX + 14;
+    const ty = event.clientY - 10;
+    tooltip.style.left = (tx + 260 > W ? tx - 270 : tx) + "px";
+    tooltip.style.top  = Math.min(ty, H - 200) + "px";
+    tooltip.classList.add("visible");
+  })
+  .on("mouseleave", function() {
+    clearHover();
+    tooltip.classList.remove("visible");
+  });
+
+// Background click to clear
+svg.on("click", function(event) {
+  if (event.target === this) {
+    activeCountry = null;
+    applyCountryFilter(null);
+    filterIndicator.classList.remove("visible");
+    d3.selectAll(".label-country").classed("active", false);
+  }
+});
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+window.addEventListener("resize", () => location.reload());
+</script>
+</body>
+</html>
