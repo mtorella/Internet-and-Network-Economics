@@ -97,12 +97,12 @@ After computing on the full global graph, we **filter to Italian nodes only** (`
 
 ```python
 # File: step3b_visualise_graph.py
-# Interactive version: network_interactive.html
+# Interactive version: viz1.html
 ```
 
 **Static version:** Vertical spine layout — Italian sectors sorted by PageRank in the centre column, top 10 trading partners split left and right, bezier arcs for the top 5% of flows by weight.
 
-**Interactive version (D3.js):** Open `network_interactive.html` in any browser.
+**Interactive version (D3.js):** Open `viz1.html` in any browser.
 - Hover an Italian sector → tooltip with PageRank, flow strength, top 3 trading partners; connected arcs highlight, others dim
 - Click a country label → filter all arcs to show only that country's flows
 - Click again or click background → clear filter
@@ -196,15 +196,9 @@ project/
 ├── 2022.csv                        ← OECD ICIO table (place here)
 ├── intangibles_analytical.csv      ← Intan-Invest data (place here)
 │
-├── step1_load_icio.py
-├── step2_build_graph.py
-├── step3_centrality.py
-├── step3b_visualise_graph.py
-├── step4_digitalisation.py
-├── step5_merge_bottlenecks.py
-├── step6_plots.py
+├── martas_proposal.ipynb
 │
-├── network_interactive.html        ← open in browser, no install needed
+├── viz1.html        ← open in browser, no install needed
 │
 ├── fig0_network_spine.png
 ├── fig1_hub_ranking.png
