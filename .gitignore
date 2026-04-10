@@ -28,3 +28,6 @@ Resources/
 # Outputs
 outputs/
 
+# Test
+tests/
+
