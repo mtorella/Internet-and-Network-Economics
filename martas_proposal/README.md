@@ -44,6 +44,22 @@ We build the network over *all* countries in the ICIO table, not just Italy's do
 
 ## Implementation — Step by Step
 
+### Alignment Between main.ipynb and second_version.py
+
+The two files follow the same analytical backbone for network construction and bottleneck detection:
+
+- Build the directed weighted global ICIO graph from the intermediate-use block.
+- Apply the same edge threshold logic ($50M).
+- Compute the same centrality family (PageRank, betweenness approximation, in/out/total strength).
+- Filter to Italian sectors after global centrality is computed.
+- Merge centrality with digitalisation metrics and identify high-centrality / low-digital sectors.
+
+Main differences are scope and engineering quality, not the conceptual method:
+
+- main.ipynb is exploratory and presentation-oriented (cell-by-cell workflow).
+- second_version.py is a reproducible pipeline script (fixed paths, schema checks, deterministic settings).
+- second_version.py is explicitly single-year (2021) and integrates prepared growth-accounts plus intangibles sources into a composite digitalisation measure.
+
 ### Step 1 — Load the ICIO Table
 
 ```python
@@ -68,6 +84,8 @@ We model the economy as a **directed weighted graph** where:
 - **Edge weight** = flow value in million USD
 
 We apply a threshold of $50M to filter out noise — very small flows add thousands of edges with no analytical value and slow down centrality computation.
+
+This thresholding logic is shared by both main.ipynb and second_version.py.
 
 **Output:** `G` — a NetworkX DiGraph with ~4,250 nodes and ~200,000 edges.
 
@@ -132,6 +150,8 @@ Where:
 
 **NACE → ICIO crosswalk:** Intan-Invest uses NACE Rev.2 sector codes; ICIO uses ISIC Rev.4. We map between them manually (e.g. NACE `C29-C30` → ICIO `C29`). Where multiple NACE codes map to one ICIO code we average the intensity scores.
 
+In second_version.py, this is extended with EUKLEMS growth-accounts ICT share for 2021, then combined with the intangibles metric into a composite score (equal-weight and weighted variants).
+
 ---
 
 ### Step 5 — Merge and Identify Double Bottlenecks
@@ -193,17 +213,28 @@ The weak negative trend across the scatter is the headline result: **Italy's mos
 ```
 project/
 │
-├── 2022.csv                        ← OECD ICIO table (place here)
-├── intangibles_analytical.csv      ← Intan-Invest data (place here)
+├── data/
+│   ├── prepared/
+│   │   └── icio_zblock_2021.csv
+│   └── processed/
+│       ├── growth_accounts_2021_wide.csv
+│       └── intangibles_analytical_2021.csv
 │
-├── martas_proposal.ipynb
+├── martas_proposal/
+│   ├── main.ipynb
+│   ├── second_version.py
+│   └── viz/
+│       └── viz1.html
 │
-├── viz1.html        ← open in browser, no install needed
-│
-├── fig0_network_spine.png
-├── fig1_hub_ranking.png
-├── fig2_centrality_map.png
-└── fig3_centrality_vs_digitalisation.png
+└── outputs/
+	├── figures/
+	│   ├── fig0_network_spine_2021.png
+	│   ├── fig1_hub_ranking_2021.png
+	│   ├── fig2_centrality_map_2021.png
+	│   └── fig3_centrality_vs_digitalisation_panel_2021.png
+	└── tables/
+		├── df_composite_2021.csv
+		└── robustness_check_2021.csv
 ```
 
 **Run order:** Steps 1 → 2 → 3 → 3b → 4 → 5 → 6
@@ -221,4 +252,21 @@ D3.js for the interactive graph is loaded from CDN — requires internet on firs
 
 ---
 
-*Data sources: OECD Inter-Country Input-Output Tables (2023 edition); Intan-Invest Database, European Investment Bank / EU Commission.*
+## Project Readiness
+
+The project is close to submission-ready.
+
+What is already ready:
+
+- Clear research question and economic mechanism.
+- Consistent network methodology across notebook and script versions.
+- Reproducible 2021 script pipeline with saved tables and figures.
+- Robustness check included for bottleneck classification variants.
+
+What should still be finalised before submission:
+
+- Add one short methodology note in the report explaining why 2021 is used consistently in second_version.py.
+- Include one sensitivity check appendix (e.g., threshold $40M/$60M or quantile-based threshold) to show ranking stability.
+- Add a pinned environment file (requirements.txt) for full reproducibility.
+
+*Data sources: OECD Inter-Country Input-Output Tables (2023 edition); Intan-Invest Database, European Investment Bank / EU Commission; EUKLEMS Growth Accounts.*
