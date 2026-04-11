@@ -87,6 +87,9 @@ We apply a threshold of $50M to filter out noise — very small flows add thousa
 
 This thresholding logic is shared by both main.ipynb and second_version.py.
 
+**Methodological choice — zeroing the diagonal:**
+Before building the graph we set all diagonal entries of `Z` to zero, removing intra-sector flows (e.g. the chemicals sector buying from itself). Intra-sector flows are economically real and can be large, but they are not relevant here. Our question is about *inter-sectoral* dependency: which sectors are pivotal because many *other* sectors rely on them? A self-loop tells us only that a sector is large and internally integrated, not that it is a structural node in the supply network. Keeping diagonal entries would inflate strength and PageRank for sectors with high internal turnover, biasing centrality rankings away from genuine inter-sectoral hubs and toward sectors that simply process a lot internally. Zeroing the diagonal ensures that centrality reflects network position, not sector size alone.
+
 **Output:** `G` — a NetworkX DiGraph with ~4,250 nodes and ~200,000 edges.
 
 ---
@@ -105,7 +108,7 @@ Three centrality measures, each capturing a different structural role:
 | **PageRank** | Recursive supply authority | A sector scores high if supplied by other important sectors — captures systemic importance |
 | **Betweenness** | Broker / bridge role | Fraction of shortest supply paths passing through a node — pure bottleneck measure |
 
-For betweenness on a graph this large we use `k=300` pivot sampling (NetworkX), which gives a good approximation in seconds rather than hours.
+Exact betweenness centrality requires computing shortest paths between every pair of nodes — O(n³) complexity for a weighted graph. With ~4,250 nodes that is billions of path calculations, infeasible in practice. We therefore use the Brandes (2001) approximation: instead of using all n nodes as path sources, NetworkX randomly samples `k=300` pivot nodes and scales the result. This reduces computation to O(k·m) where m is the number of edges, producing stable rankings in seconds. `k=300` corresponds to sampling ~7% of all nodes — sufficient to reliably rank the top sectors, which is all that matters for identifying bottlenecks. The `seed=42` parameter ensures the sample is fixed and results are reproducible across runs.
 
 After computing on the full global graph, we **filter to Italian nodes only** (`ITA_*`) for analysis and visualisation.
 
@@ -129,13 +132,15 @@ Top 10 trading partners identified (excluding ROW aggregate): **DEU, FRA, CN1, U
 
 ---
 
-### Step 4 — Digitalisation Intensity Score
+### Step 4 — Digitalisation Measures
 
 ```python
 # File: step4_digitalisation.py
 ```
 
-From Intan-Invest (Italy, 2021):
+Two independent digitalisation proxies are computed for Italian sectors, both normalised to [0, 1] using min-max scaling before any comparison:
+
+**Digital intensity (Intan-Invest):**
 
 $$\text{Digitalisation intensity}_s = \frac{I\_Soft\_DB_s + I\_RD_s}{VA\_CP_s}$$
 
@@ -144,13 +149,13 @@ Where:
 - `I_RD` = R&D investment
 - `VA_CP` = value added at current prices
 
-**Theoretical justification:** Following the CHS framework, these two components capture a sector's *active accumulation of digital productive capacity*. Software & databases are the most direct measure of digital capital formation; R&D proxies both innovation effort and absorptive capacity — the ability to actually use digital technologies productively. Dividing by value added normalises for sector size, making the measure comparable across sectors of very different scales.
+Following the CHS framework, these two components capture a sector's *active accumulation of digital productive capacity*. Dividing by value added normalises for sector size. Available for all matched sectors.
+
+**ICT share (EUKLEMS growth accounts):** Share of ICT capital in total capital services. Captures the *stock* of digital capital already embedded in production. Available for 33 of the 37 matched sectors — water transport (H50), air transport (H51), warehousing (H52), and postal services (H53) have no EUKLEMS entry for Italy in 2021.
 
 **Note on temporal mismatch:** Intan-Invest runs to 2021; ICIO to 2022. The 1-year gap is minimal and unlikely to affect structural rankings.
 
-**NACE → ICIO crosswalk:** Intan-Invest uses NACE Rev.2 sector codes; ICIO uses ISIC Rev.4. We map between them manually (e.g. NACE `C29-C30` → ICIO `C29`). Where multiple NACE codes map to one ICIO code we average the intensity scores.
-
-In second_version.py, this is extended with EUKLEMS growth-accounts ICT share for 2021, then combined with the intangibles metric into a composite score (equal-weight and weighted variants).
+**NACE → ICIO crosswalk:** Both EUKLEMS and Intan-Invest use NACE Rev.2 sector codes; ICIO uses ISIC Rev.4. We map between them manually. ICIO is the coarser classification (38 unique codes vs 50 NACE keys), so multiple NACE codes collapse into one ICIO code — where this happens, scores are averaged across NACE sub-sectors. Unmatched NACE codes (`TOT`, `MARKT`, `MARKTxAG`, `C`, `TOT_IND`) are aggregate convenience rows in EUKLEMS and are correctly excluded; `Q87-Q88` and `T` are genuine gaps in the crosswalk (see Known Issues).
 
 ---
 
@@ -160,12 +165,12 @@ In second_version.py, this is extended with EUKLEMS growth-accounts ICT share fo
 # File: step5_merge_bottlenecks.py
 ```
 
-We merge the Italian centrality data with the digitalisation scores on the sector code, then apply a dual threshold to identify **double bottlenecks**:
+Italian centrality data is merged with both digitalisation measures. A sector is a **double bottleneck** if:
 
 - PageRank ≥ 60th percentile among Italian sectors → *structurally central*
-- Digitalisation intensity ≤ 40th percentile → *digitally lagging*
+- Digitalisation ≤ 40th percentile → *digitally lagging*
 
-Sectors satisfying both conditions simultaneously are the core finding of the analysis.
+The classification is run independently on each measure (**Variant A** — digital intensity; **Variant B** — ICT share). Sectors flagged in both variants are **robust double bottlenecks** — the finding is not sensitive to the choice of digitalisation proxy.
 
 ---
 
@@ -175,13 +180,15 @@ Sectors satisfying both conditions simultaneously are the core finding of the an
 # File: step6_plots.py
 ```
 
-Three figures:
+Four figures:
+
+**Fig 0 — Network Spine:** Italy's position in the global supply network. Italian sectors sorted by PageRank in the centre column; top 10 trading partners split left and right; bezier arcs for the top 5% of bilateral flows by weight.
 
 **Fig 1 — Hub Ranking:** Horizontal bar chart of top 15 sectors by total IO flow strength. Establishes which sectors are economically large in the global supply chain.
 
-**Fig 2 — Centrality Map:** Scatter of PageRank vs. Betweenness, bubble size = total flow. Separates sectors that are large *recipients* of supply chain inputs (high PageRank) from those that act as *bridges* (high betweenness).
+**Fig 2 — Centrality Map:** Scatter of PageRank vs. Betweenness, bubble size = total flow. Separates sectors that are large *recipients* of supply chain inputs (high PageRank) from those that act as *bridges* (high betweenness). The two roles do not always coincide.
 
-**Fig 3 — Main Result:** Scatter of PageRank vs. Digitalisation intensity, with median dashed lines creating four quadrants. The top-left quadrant (high centrality, low digitalisation) is the double bottleneck zone.
+**Fig 3 — Main Result:** Two-panel scatter of PageRank vs. digitalisation score, one panel per variant. The top-left quadrant (high centrality, low digitalisation) is the double bottleneck zone, marked by red dashed threshold lines. Sectors robust across both variants are highlighted with a white ring.
 
 ---
 
@@ -194,17 +201,11 @@ Wholesale & retail ($440B), Construction ($296B), and Professional services ($27
 Health & social work has the highest PageRank but near-zero betweenness — it is a major recipient of supply chain inputs but not a bridge. The sectors with the highest betweenness (Furniture & repair, Textiles, Fabricated metals) are structural bridges whose disruption would disconnect many supply paths beyond what their size implies.
 
 ### What Figure 3 tells us — the core finding
-Three sectors sit firmly in the double bottleneck quadrant:
+Sectors in the double bottleneck quadrant (top-left: high PageRank, low digitalisation) are the core finding. Sectors flagged as robust — appearing in both Variant A (digital intensity) and Variant B (ICT share) — are the most reliable candidates.
 
-| Sector | PageRank | Dig. Intensity | Why it matters |
-|---|---|---|---|
-| **Health & social work** | Highest | Near zero | Most supply-network-dependent sector, essentially undigitalised |
-| **Construction** | 2nd | Very low | $296B in flows, chronic digital laggard across Europe |
-| **Wholesale & retail** | 3rd | Below median | Largest sector by volume, digitalisation intensity below median |
+The weak negative trend across both panels is the headline result: **Italy's most central production sectors tend to be its least digitalised** — the opposite of what an efficient digital transition would require.
 
-Sectors in the resilient hub quadrant (top-right): Motor vehicles, Machinery, Professional services — high centrality combined with above-median digitalisation.
-
-The weak negative trend across the scatter is the headline result: **Italy's most central production sectors tend to be its least digitalised** — the opposite of what an efficient digital transition would require.
+Sectors in the resilient hub quadrant (top-right): high centrality combined with above-median digitalisation on both measures — these sectors are not a concern.
 
 ---
 
@@ -249,6 +250,26 @@ pip install pandas numpy networkx matplotlib seaborn
 ```
 
 D3.js for the interactive graph is loaded from CDN — requires internet on first open, then works offline.
+
+---
+
+## Known Issues
+
+### NACE codes unmatched in the EUKLEMS → ICIO crosswalk
+
+When mapping EUKLEMS growth accounts to ICIO sector codes, 7 rows have no entry in `NACE_TO_ICIO` and are dropped. The unmatched codes are:
+
+| Code | Description | Action |
+|---|---|---|
+| `TOT` | Total economy | Correctly excluded — aggregate summary row |
+| `TOT_IND` | Total industries | Correctly excluded — aggregate summary row |
+| `MARKT` | Market economy | Correctly excluded — aggregate summary row |
+| `MARKTxAG` | Market economy excl. agriculture | Correctly excluded — aggregate summary row |
+| `C` | Total manufacturing | Correctly excluded — too broad to map to a single ICIO code |
+| `Q87-Q88` | Residential care & social work | **Genuine gap** — valid sector with no entry in the crosswalk |
+| `T` | Household services as employers | **Genuine gap** — present in `SECTOR_LABELS` but missing from `NACE_TO_ICIO` |
+
+The first five are EUKLEMS convenience aggregates that should never be mapped. `Q87-Q88` and `T` are real sectors that could in principle be added to the crosswalk and recovered for the analysis.
 
 ---
 
