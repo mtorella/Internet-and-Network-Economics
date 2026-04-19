@@ -1,165 +1,127 @@
 # Digital Transition and Supply-Chain Structure in the Italian Economy
 
-Internet and Network Economics — Group Project
+Internet and Network Economics — Group Project 2025-2026
 
----
-
-## Research Question
-
-Italy's economy is embedded in a global production network. Some sectors are central suppliers for many downstream activities. If these central sectors underinvest in digital capital, the resulting productivity drag can propagate economy-wide.
-
-The project asks:
-
-> Are the sectors most central in Italy's production network also the sectors most digitally lagging?
-
-When both conditions hold, we call the sector a robust bottleneck.
-
----
+## Introduction
+Italy's economy is embedded in a global production network where sectors are interconnected through complex input-output relationships. Some sectors may be structurally central, acting as key suppliers to many downstream activities, while others remain more peripheral. At the same time, sectors differ considerably in their degree of digitalisation, in terms of ICT investment, digital capital intensity, or adoption of digital technologies. The central question of this project is whether these two dimensions, structural centrality and digitalisation, are systematically correlated. Answering this question matters because it speaks to a common assumption in the digital transition literature, namely that all sectors must digitalise to remain competitive and structurally important. The empirical analysis aims to assess whether this association holds for Italy, without making causal or normative claims about what any sector's position implies.
 
 ## Economic Logic
-
-1. Production network propagation.
-Shocks in highly central sectors do not average out. They transmit through input-output linkages and can affect aggregate outcomes.
-
-2. Intangible-capital accumulation.
-Digital investment (software, R&D, ICT capital) is a key driver of modern productivity growth. Underinvestment creates persistent capability gaps.
-
-The central contribution is the interaction of these two mechanisms: structural centrality multiplied by digital weakness.
-
----
+Production network propagation. Sectors that are structurally central act as key suppliers to many downstream activities. If digital investment raises productivity, then a central sector that digitalises can propagate efficiency gains broadly through the network, creating a systemic incentive for central sectors to be digitally intensive. This suggests a positive relationship between centrality and digitalisation.
+Intangible capital accumulation. Digital investment in software, R&D and ICT capital is a key driver of modern productivity growth, and sectors that face stronger competitive pressures may have greater incentives to accumulate these assets. However, sectors whose centrality is structurally guaranteed, for instance because they supply physically irreplaceable inputs, may face weaker competitive pressure and therefore lower incentives to digitalise, independently of their position in the network.
+These two mechanisms generate competing predictions. The first suggests that centrality and digitalisation should go together. The second suggests that certain sectors can maintain structural relevance without digital intensity, depending on the nature of their centrality. The empirical analysis aims to assess which of these patterns characterises Italy's production network.
 
 ## Data Sources
 
+The analysis draws on two main datasets.
+
 | Dataset | Source | Content |
 |---|---|---|
-| OECD ICIO (2023 edition) | OECD | Inter-country input-output flows, 2016-2022, about 76 countries x 45 sectors |
-| EUKLEMS Growth Accounts | EUKLEMS and INTANProd | ICT capital share by country-sector-year |
-| Intan-Invest | EU Commission and EIB | Intangible investment (software, R&D) by sector |
+| OECD ICIO (2025 edition) | OECD | Inter-country input-output flows, 1995 to 2022, 85 countries and country groupings, 50 sectors |
+| EUKLEMS Statistical Module | EUKLEMS and INTANProd, LUISS University | Industry-level capital accounts including ICT and non-ICT capital services, 27 EU member states plus UK, US and Japan, 42 industries, 1995 to 2020 |
+| EUKLEMS Analytical Module | EUKLEMS and INTANProd, LUISS University | Industry-level investment and capital stocks for intangible assets beyond national accounts boundaries, including software, R&D, organisational capital and brand, same country and industry coverage |
 
-Design choice (open economy): centrality is computed on the full global ICIO network, then Italian sectors are extracted. This avoids domestic-only bias.
+The first dataset is the OECD Inter-Country Input-Output tables, 2025 edition, which provide a globally balanced view of the inter-country and inter-industry flows of goods and services used as intermediate inputs and to meet final demand, covering 85 countries and country groupings across 50 sectors over the period 1995 to 2022. These tables are used to construct the production network and compute sector-level centrality measures for Italy.
 
----
+The second is the EUKLEMS and INTANProd database, funded by the Directorate General for Economic and Financial Affairs of the European Commission and developed at LUISS University Rome, which provides industry-level data on output, value added, employment, and capital stocks across both tangible and intangible assets for 27 EU member states, the United Kingdom, the United States and Japan, covering 42 industries over the period 1995 to 2020. The database is organised in two modules: a statistical module, which draws directly from national accounts and provides standard growth accounting variables including ICT and non-ICT capital services; and an analytical module, which extends the asset boundary to include intangible assets not recorded as investment under current national accounts standards, notably software and databases, R&D, organisational capital, brand and training.
 
-## Project Scripts
+## Data Processing
+The two datasets are processed separately and then merged through a crosswalk between the NACE industry classification used in EUKLEMS and the ICIO sector classification.
 
-- `Src/preprocessing.py` prepares cleaned yearly inputs.
-- `Src/analysis.py` is the baseline 2021 cross-sectional script.
-- `Src/analysis_2.py` is the corrected multi-year panel pipeline (2016-2021) and should be used for the main reported results.
+### Digitalisation Metrics
 
-Run from repository root:
+Digitalisation is measured using two distinct proxies, each drawn from a different module of the EUKLEMS and INTANProd database and capturing a different dimension of digital intensity at the sector level.
 
-```bash
-python Src/analysis_2.py
-```
+- **Digital intensity**: This proxy measures the share of value added that a sector invests in software, databases, and R&D — the two intangible asset categories most
+directly associated with digital activity. It is drawn from the analytical module, which extends the standard national accounts asset boundary to include
+intangible investments not conventionally recorded as capital formation.
 
----
+$$\text{dig\_intensity}_s = \frac{I\_Soft\_DB_s + I\_RD_s}{VA\_CP_s}$$
 
-## Corrected Pipeline in `analysis_2.py`
+- **ICT capital share**: This proxy measures the share of total capital services accounted for by ICT capital — computer hardware and telecommunications equipment. It is drawn from
+the statistical module, which follows standard national accounts definitions and provides a more conservative but internationally comparable measure of
+digital capital intensity.
 
-### Part 1. Coefficient-based network and centrality
+$$\text{ict\_share}_s = \frac{CAPICT\_QI_s}{CAP_s}$$
 
-For each year (2016-2021), the script builds a directed graph from the Leontief coefficient matrix:
+The two proxies are complementary. The first captures investment flows into knowledge-based digital assets; the second captures the accumulated stock of
+physical ICT capital. A sector can score high on one and low on the other — for instance, a sector that relies heavily on existing ICT infrastructure but
+invests little in new software.
 
-$$
-a_{ij} = \frac{z_{ij}}{\sum_i z_{ij}}
-$$
+Both proxies are normalised to the unit interval using min-max scaling before any comparison or visualisation, so that differences in units and scale do not drive the results.
 
-An edge is retained when $a_{ij} \ge 0.01$. This share threshold is structural and avoids nominal-size bias.
+## Crosswalk: NACE to ICIO
 
-Computed metrics:
+The two datasets speak different classification languages. EUKLEMS uses **NACE Rev. 2** codes (e.g. `C26`, `M-N`, `J62-J63`), while ICIO uses its
+own sector codes (e.g. `C26`, `M`, `N`, `J62_63`). A direct merge is not possible and hence crosswalk is required.
 
-- PageRank
-- Betweenness (approximate, `k=300`, `seed=42`)
-- In-strength and out-strength
+We use ICIO codes as the canonical identifier, since it is much easier to aggregate a digitalisation metric from NACE to ICIO than to disaggregate ICIO sectors into NACE sub-sectors, especially because from a graph-theoretic perspective we want to preserve the full ICIO network structure. The crosswalk is implemented as a dictionary mapping NACE codes to lists of ICIO codes, for instance:
 
-### Part 2. Digitalisation measures
+    "C26":     ["C26"]           # one-to-one
+    "C16-C18": ["C16", "C17_18"] # one NACE, two ICIO
+    "A":       ["A01", "A02", "A03"]
 
-Two normalised proxies are merged for Italian sectors:
+All values are lists for consistency. For each EUKLEMS observation we look up the corresponding ICIO codes, explode into one row per code, and average where
+multiple NACE codes map to the same ICIO code. We track source quality with an `ict_source` flag: `direct` when a NACE code maps to exactly one ICIO code, `aggregate` otherwise. Aggregate-source sectors carry the same digitalisation value across multiple ICIO codes and are less reliable. ICIO sectors with no NACE match in the EUKLEMS Italy data appear in the centrality panel with missing digitalisation values.
 
-- Variant A: digital intensity
+### From Input-Output Flows to a Directed Graph
 
-$$
-	ext{dig\_intensity}_s = \frac{I\_Soft\_DB_s + I\_RD_s}{VA\_CP_s}
-$$
+The starting point of the network analysis is the intermediate flow matrix extracted from the OECD ICIO tables. For a given year, let $z_{ij}$ denote the value of intermediate inputs supplied by sector $i$ to sector $j$, measured in current USD. These flows are recorded for all pairs of the $N = 50$ sectors present in the ICIO tables for the Italian economy.
 
-- Variant B: ICT capital share (EUKLEMS)
+The raw flow matrix $\mathbf{Z}$ captures the monetary volume of production interdependencies, but it is sensitive to the overall scale of the economy: a large sector will mechanically show large flows even if its structural role is modest. To remove this nominal-size bias, we normalise each column of $\mathbf{Z}$ by the total intermediate input purchases of the receiving sector, obtaining the matrix of Leontief technical coefficients:
 
-Crosswalk handling (`Src/utils/constants.py`): NACE-to-ICIO mappings are exploded and aggregated to ICIO level.
+$$a_{ij} = \frac{z_{ij}}{\sum_{i} z_{ij}}$$
 
-For Variant B, source quality is tracked:
+The coefficient $a_{ij}$ measures the share of sector $j$'s intermediate inputs that originate from sector $i$. It is a structural, scale-invariant quantity: it reflects how dependent sector $j$ is on sector $i$ as a supplier, independently of whether the economy is large or small in absolute terms. This normalisation ensures that the network topology we recover is driven by the organisation of production rather than by nominal magnitudes.
 
-- `direct`: direct NACE-to-ICIO match
-- `aggregate`: value inherited from broader NACE aggregate
+**Sparsification.** The full coefficient matrix is dense by construction, since most entries $a_{ij}$ are positive but very small, representing economically negligible input relationships. We therefore apply a minimum threshold of $a_{ij} \geq 0.01$, retaining only those supplier–buyer relationships in which sector $i$ accounts for at least one percent of sector $j$'s total intermediate purchases. Edges falling below this threshold are set to zero. The threshold is structural rather than data-driven: it filters out noise while preserving all economically meaningful supply linkages.
 
-Variant B bottleneck classification uses only direct-source sectors.
+The resulting object is a weighted directed graph $G = (V, E, w)$, where:
 
-### Part 3. Typology and bottleneck classification
+- the node set $V$ contains the 50 Italian sectors;
+- each directed edge $(i \to j) \in E$ indicates that sector $i$ is a meaningful intermediate
+  supplier to sector $j$;
+- the edge weight $w_{ij} = a_{ij}$ records the intensity of that supply relationship.
 
-A sector is flagged in a variant if:
+This procedure is repeated independently for each year in the window 2016–2021, yielding a sequence of six annual graphs that allow us to assess the stability of the network structure over time.
 
-- PageRank is at or above the 60th percentile
-- Digital score is at or below the variant threshold
+### Centrality Measures
 
-Thresholds:
+Four centrality measures are computed for every node in each annual graph. All measures operate on the weighted, directed graph of technical coefficients described above.
 
-- Variant A: 40th percentile digital cutoff
-- Variant B: 30th percentile digital cutoff (direct-source subset)
+- **PageRank**: the stationary distribution of a random walk on the directed graph, where transition probabilities are proportional to edge weights. A sector's PageRank score reflects how much of the global flow of intermediate demand passes through it, accounting for the full recursive structure of the network. This is the primary centrality measure used in the analysis.
 
-Robust bottleneck = flagged in both variants.
+- **Betweenness centrality**: the fraction of shortest paths between all pairs of nodes that pass through a given sector, normalised to the unit interval. It captures a sector's role as a structural bridge in the network. Shortest paths are weighted by the inverse of edge weight, so that stronger supply relationships are treated as shorter. Given the size of the graph, betweenness is approximated using a random sample of $k = 500$ pivot nodes.
 
-Digital typology (median splits):
+- **In-strength** and **out-strength**: the sum of incoming and outgoing edge weights for each node, respectively. In-strength measures how intensively a sector draws on other sectors as suppliers; out-strength measures how intensively it supplies inputs to others.
 
-- Digital leader
-- In transition
-- Past adopter
-- Structurally lagging
-- Unknown (missing one or both digital metrics)
+PageRank and betweenness are additionally normalised to the unit interval using within-year min-max scaling, producing `pagerank_norm` and `betweenness_norm`. This facilitates visual comparison across sectors within a given year. Normalised values should not be compared across years, as the scaling is performed independently for each annual graph.
 
-### Part 4. Outputs
+## Analysis
 
-Table:
+The analysis examines whether sector-level digitalisation is systematically associated with supply-chain centrality across Italian sectors over the period 2016–2021. The two datasets are merged through the NACE-to-ICIO crosswalk described above, yielding a panel of 49 Italian sectors per year.
 
-- `outputs/tables/panel_bottleneck_2016_2021.csv`
+### Digitalisation Rankings
 
-Figures:
+For each year, horizontal bar charts display the ten sectors with the highest raw ICT capital share and the ten sectors with the highest raw digital intensity. These charts use the unscaled proxies and serve as a descriptive baseline, showing which sectors are most digitalised in absolute terms independently of their network position.
 
-- `outputs/figures/figA_bottleneck_panel_2016_2021.png`
-- `outputs/figures/figB_typology_scatter_2021.png`
-- `outputs/figures/figC_coeff_pagerank_vs_digital_2021.png`
+### Correlation Analysis
 
----
+The statistical relationship between supply-chain centrality and digitalisation is assessed using Spearman rank correlation. For each year and each digitalisation proxy, the Spearman coefficient between `pagerank_norm` and the normalised proxy is computed together with a 95% confidence interval derived from the Fisher $z$-transformation:
 
-## Corrections Implemented (April 2026)
+$$z = \text{arctanh}(r), \quad \text{SE}(z) = \frac{1}{\sqrt{n-3}}, \quad \text{CI} = \left[\tanh(z - z_{0.025} \cdot \text{SE}),\ \tanh(z + z_{0.025} \cdot \text{SE})\right]$$
 
-1. Typology assignment no longer pushes missing-data sectors into Structurally lagging; they remain Unknown.
-2. Heatmap row sorting now reflects all non-zero bottleneck statuses.
-3. Variant B threshold plotting handles undefined direct-source cutoffs safely.
-4. Bubble-size scaling now guards against zero denominators.
-5. Legend style warning in Figure A was removed.
-6. Duplicate `C16-C18` key in `NACE_TO_ICIO` was removed to prevent silent overwrite ambiguity.
+Spearman rank correlation is used rather than Pearson because both the centraliy and digitalisation distributions are right-skewed, and the research question concerns monotonic association rather than a linear one. Because Spearman operates on ranks, the choice of min-max normalisation does not affect the results; the normalised and raw series yield identical coefficients.
 
----
+### Quadrant Classification
 
-## Core Result
+Each year, sectors are classified into four quadrants based on their joint position in the centraliy–digitalisation space. The split is applied at a fixed threshold of 0.5 on the normalised scale for both axes:
 
-Across both digital proxies, central Italian sectors tend to be less digitally advanced than less-central sectors. The persistence of robust bottlenecks across 2016-2021 suggests the issue is structural, not a one-year anomaly.
+| Quadrant | Centrality | Digitalisation |
+|---|---|---|
+| HH | $\geq 0.5$ | $\geq 0.5$ |
+| HL | $\geq 0.5$ | $< 0.5$ |
+| LH | $< 0.5$ | $\geq 0.5$ |
+| LL | $< 0.5$ | $< 0.5$ |
 
----
+A fixed threshold is used rather than the sample mean to ensure that quadrant boundaries do not shift with the distribution from year to year, which would make quadrant membership incomparable across the panel. The value 0.5 corresponds to the midpoint of the min-max normalised range and has a natural interpretation: a sector is classified as high if its value lies in the upper half of the observed range for that year.
 
-## Important Caveats
-
-1. Coverage constraints: some ICIO sectors are unavailable or only available through aggregate-source mappings.
-2. Data horizon alignment: because Intan-Invest ends in 2021, the validated panel window is 2016-2021.
-3. Crosswalk granularity: one-to-many mappings assign shared values across sub-sectors, which is a necessary approximation.
-
----
-
-## Installation
-
-```bash
-pip install pandas numpy networkx matplotlib
-```
-
----
-
-Data sources: OECD Inter-Country Input-Output Tables (2023 edition), Intan-Invest (European Investment Bank / EU Commission), EUKLEMS Growth Accounts.
