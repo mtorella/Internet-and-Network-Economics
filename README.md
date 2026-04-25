@@ -47,16 +47,40 @@ Both proxies are normalised to the unit interval using min-max scaling before an
 
 ## Crosswalk: NACE to ICIO
 
-The two datasets speak different classification languages. EUKLEMS uses **NACE Rev. 2** codes (e.g. `C26`, `M-N`, `J62-J63`), while ICIO uses its
-own sector codes (e.g. `C26`, `M`, `N`, `J62_63`). A direct merge is not possible and hence crosswalk is required.
+The two datasets speak different classification languages.
 
-We use ICIO codes as the canonical identifier, since it is much easier to aggregate a digitalisation metric from NACE to ICIO than to disaggregate ICIO sectors into NACE sub-sectors, especially because from a graph-theoretic perspective we want to preserve the full ICIO network structure. The crosswalk is implemented as a dictionary mapping NACE codes to lists of ICIO codes, for instance:
+EUKLEMS uses **NACE Rev. 2** codes. In the Italian sample we observe 58 unique NACE codes:
 
-    "C26":     ["C26"]           # one-to-one
-    "C16-C18": ["C16", "C17_18"] # one NACE, two ICIO
-    "A":       ["A01", "A02", "A03"]
+- `A`, `B`, `C`, `C10-C12`, `C13-C15`, `C16-C18`, `C19`, `C20`, `C20-C21`, `C21`, `C22-C23`, `C24-C25`
+- `C26`, `C26-C27`, `C27`, `C28`, `C29-C30`, `C31-C33`, `D`, `D-E`, `E`, `F`, `G`, `G45`
+- `G46`, `G47`, `H`, `H49`, `H50`, `H51`, `H52`, `H53`, `I`, `J`, `J58-J60`, `J61`
+- `J62-J63`, `K`, `L`, `L68A`, `M`, `M-N`, `MARKT`, `MARKTxAG`, `N`, `O`, `O-Q`, `P`
+- `Q`, `Q86`, `Q87-Q88`, `R`, `R-S`, `S`, `T`, `TOT`, `TOT_IND`, `U`
 
-All values are lists for consistency. In the current codebase, the Python merge pipeline maps ICIO codes to NACE codes (in `Src/utils/constants.py`) and then merges centrality and digitalisation at that sector-code level. ICIO sectors with no NACE match in the EUKLEMS Italy data appear in the centrality panel with missing digitalisation values.
+ICIO uses its own sector codes and is more granular for several production activities. In the Italian network we use 50 ICIO codes:
+
+- `A01`, `A02`, `A03`, `B05`, `B06`, `B07`, `B08`, `B09`, `C10T12`, `C13T15`
+- `C16`, `C17_18`, `C19`, `C20`, `C21`, `C22`, `C23`, `C24A`, `C24B`, `C25`
+- `C26`, `C27`, `C28`, `C29`, `C301`, `C302T309`, `C31T33`, `D`, `E`, `F`
+- `G`, `H49`, `H50`, `H51`, `H52`, `H53`, `I`, `J58T60`, `J61`, `J62_63`
+- `K`, `L`, `M`, `N`, `O`, `P`, `Q`, `R`, `S`, `T`
+
+Some are one-to-one matches with NACE, while others are aggregates or splits. For instance, ICIO `C16` corresponds to NACE `C16-C18`, while ICIO `C26` corresponds to NACE `C26`. ICIO also includes sectors such as `C301` and `C302T309`, both mapping to NACE `C29-C30`.
+
+Another issue is that in some cases more ICIO sectors, such as `A01`, `A02` and `A03`, correspond to a single NACE sector, in this case `A`. This is because the ICIO classification is designed to capture the full structure of global production networks, which requires a more detailed breakdown of certain sectors that play a key role in international trade and supply chains. The NACE classification, by contrast, is designed for national statistical purposes and therefore allows for more aggregation in some areas.
+
+Hence, a direct merge is not possible and a crosswalk is required.
+
+We use ICIO codes as the canonical identifier, since it is much easier to aggregate digitalisation from NACE to ICIO than to disaggregate ICIO sectors into NACE sub-sectors, and we want to preserve the full ICIO network structure.
+
+In the current codebase, the crosswalk is implemented as a dictionary mapping **ICIO to NACE** in `Src/utils/constants.py` (`ICIO_TO_NACE`), for instance:
+
+  "C26": "C26"          # one-to-one
+  "A01": "A"            # many ICIO sectors map to one NACE aggregate
+  "A02": "A"
+  "A03": "A"
+
+So the implemented logic is many-to-one at the code-system level (multiple ICIO sectors can map to one NACE code), but the dictionary direction is ICIO -> NACE. ICIO sectors with no NACE match in the EUKLEMS Italy data appear in the centrality panel with missing digitalisation values.
 
 ### From Input-Output Flows to a Directed Graph
 
@@ -72,7 +96,7 @@ The coefficient $a_{ij}$ measures the share of sector $j$'s intermediate inputs 
 
 The resulting object is a weighted directed graph $G = (V, E, w)$, where:
 
-- the node set $V$ contains the 50 Italian sectors;
+- the node set $V$ contains the global sectors;
 - each directed edge $(i \to j) \in E$ indicates that sector $i$ is a meaningful intermediate
   supplier to sector $j$;
 - the edge weight $w_{ij} = a_{ij}$ records the intensity of that supply relationship.
@@ -120,84 +144,60 @@ Each year, sectors are classified into four quadrants based on their joint posit
 
 A fixed threshold is used rather than the sample mean to ensure that quadrant boundaries do not shift with the distribution from year to year, which would make quadrant membership incomparable across the panel. The value 0.5 corresponds to the midpoint of the min-max normalised range and has a natural interpretation: a sector is classified as high if its value lies in the upper half of the observed range for that year.
 
-## Current Project Structure and Execution
+## Results and Economic Interpretation
+
+This section reports the main outputs directly from the generated figures and tables.
+
+![Spearman correlation over time](outputs/figures/fig_correlation.png)
+
+![Top-10 digitalisation sectors in 2021](outputs/figures/fig_bars_2021.png)
+
+![Centrality-digitalisation quadrants in 2021](outputs/figures/fig_quadrants_2021.png)
+
+### Consolidated Results Table (2016-2021)
+
+The table below is built from `outputs/tables/sector_panel_YYYY.csv` files. Correlations are Spearman between normalised PageRank and each digital proxy. Quadrant counts are reported as HH/HL/LH/LL and are computed on non-missing observations for each proxy.
+
+| Year | N corr (contrib) | rho contrib | Quadrants contrib (HH/HL/LH/LL) | N corr (depth) | rho depth | Quadrants depth (HH/HL/LH/LL) |
+|---:|---:|---:|:---|---:|---:|:---|
+| 2016 | 44 | 0.133 | 0/0/2/42 | 44 | -0.031 | 0/0/35/9 |
+| 2017 | 44 | -0.053 | 0/0/3/41 | 44 | -0.056 | 0/0/35/9 |
+| 2018 | 44 | -0.081 | 0/1/4/39 | 44 | -0.006 | 1/0/34/9 |
+| 2019 | 44 | -0.038 | 0/0/4/40 | 44 | -0.001 | 0/0/36/8 |
+| 2020 | 44 | -0.006 | 0/0/2/42 | 44 | -0.122 | 0/0/34/10 |
+| 2021 | 44 | -0.076 | 2/5/3/34 | 22 | -0.269 | 3/0/11/8 |
+
+### What the outputs show
+
+- Correlation panel: the contribution correlation is close to zero in every year except a mild positive value in 2016; the depth correlation becomes more negative in 2020-2021, with the lowest value in 2021.
+- 2021 bar chart: top digital contribution sectors are C29, C301 and C302T309, while top digital depth sectors are B06, B09 and B05.
+- 2021 quadrant chart: in the contribution panel, J58T60 and J62_63 are in HH, while C29/C301/C302T309 are in LH; in the depth panel, O, M and R are in HH, and several B sectors are LH.
+- Table confirmation: LL dominates in the contribution proxy for 2016-2020; LH dominates in the depth proxy in all years; 2021 is the only year where HH becomes non-zero for both proxies.
+
+### Interpretation constrained to these outputs
+
+From the visible figures and the table above, centrality and digitalisation do not move together strongly or consistently across the sample period. The ranking and quadrant outputs show that the sectors leading digital contribution and depth are not the same sectors that repeatedly occupy the highest centrality positions.
+
+## Repository Structure and Execution
 
 The repository is currently organised as follows:
 
-- `Src/preprocessing.py`: builds annual digitalisation files (`digitalisation_YYYY.csv`) and extracts annual ICIO Z-block files (`icio_zblock_YYYY.csv`).
-- `Src/network_centrality.py`: computes network centrality indicators from each yearly Z-block and writes `centrality_YYYY.csv`.
-- `Src/analysis.py`: merges annual centrality and digitalisation files and generates figures and per-year output tables.
-- `dashboard/index.html`, `dashboard/styles.css`, `dashboard/app.js`: interactive dashboard (split into separate HTML, CSS and JavaScript files).
+- `Src/1_preprocessing.py`: builds annual digitalisation files (`digitalisation_YYYY.csv`) and extracts annual ICIO Z-block files (`icio_zblock_YYYY.csv`).
+- `Src/2_network_centrality.py`: computes network centrality indicators from each yearly Z-block and writes `centrality_YYYY.csv`.
+- `Src/3_analysis.py`: merges annual centrality and digitalisation files and generates figures and per-year output tables.
+- `Src/4_build_dashboard_bundle.py`: generates the dashboard data bundle (`dashboard/data.bundle.js`).
+- `Src/5_Full_Pipeline.py`: runs the full workflow end-to-end.
+- `dashboard/index.html`, `dashboard/styles.css`, `dashboard/app.js`: interactive dashboard.
 
 Suggested execution order:
 
-1. `python Src/preprocessing.py`
-2. `python Src/network_centrality.py`
-3. `python Src/analysis.py`
-4. `python Src/build_dashboard_bundle.py` (bundle generation)
-5. Open `dashboard/index.html` directly in your browser (or serve via `python -m http.server 8000` and open `/dashboard/index.html`)
+1. `python Src/1_preprocessing.py`
+2. `python Src/2_network_centrality.py`
+3. `python Src/3_analysis.py`
+4. `python Src/4_build_dashboard_bundle.py`
 
-## Economic Evaluation (Professor-Style)
+Alternative:
 
-This project has a clear and meaningful economic question: whether structurally central sectors in Italy's production network are also the most digitalised. That question is relevant for industrial policy, because it distinguishes between "digitally advanced" sectors and "systemically important" sectors. In network terms, those are not necessarily the same thing.
+1. `python Src/5_Full_Pipeline.py`
 
-What gives the project real economic value:
-
-- It links production-network structure (ICIO) and digital capital/intangible investment (EUKLEMS/INTANProd), which are often studied separately.
-- It uses two complementary digitalisation proxies — a flow measure (growth contribution of software and database capital) and a stock measure (digital capital depth relative to value added) — which is good practice because dynamic and structural dimensions of digitalisation can diverge.
-- It frames results as associations rather than causal effects, avoiding over-claiming.
-
-Where economic interpretation should remain cautious:
-
-- The analysis is contemporaneous and sector-level. It cannot identify whether digitalisation causes centrality, centrality causes digitalisation, or both are driven by omitted factors (regulation, market structure, trade exposure, energy prices, etc.).
-- Min-max normalisation by year helps visual comparison but weakens intertemporal comparability of "high" and "low" labels.
-- The fixed quadrant threshold at 0.5 is transparent, but it is still a classification convention; small movements around the cutoff can change quadrant labels without large economic changes.
-
-Bottom line on economic meaning: the project is economically meaningful as a structural descriptive analysis and a hypothesis-screening exercise. It is not yet a causal policy-evaluation framework.
-
-## Code-Level Issues Found in Src
-
-After reviewing `Src` files, these are the main technical and methodological issues to address:
-
-1. **Betweenness centrality weighting is inconsistent with the README definition**.
-  - `Src/network_centrality.py` computes `nx.betweenness_centrality(..., weight="weight")` directly.
-  - In NetworkX, weighted betweenness treats the weight as a distance/cost, so larger weights become longer paths.
-  - Economically, stronger linkages should generally imply shorter effective distance. This usually requires using an inverse-weight distance.
-
-2. **Crosswalk coding is inconsistent between Python and dashboard JavaScript**.
-  - `Src/utils/constants.py` uses ICIO codes like `C10T12`, `C24A`, `C301`, etc.
-  - `dashboard/app.js` currently uses a different coding style in its mapping (for example, hyphen/range variants and different code families).
-  - This can generate mismatches in the browser-side merge and therefore distort the dashboard statistics.
-
-3. **Pipeline scripts are not modularized into callable functions/CLI steps**.
-  - `Src/preprocessing.py`, `Src/network_centrality.py`, and `Src/analysis.py` execute top-to-bottom at import time.
-  - This makes testing, partial reruns, and reproducibility checks harder than necessary.
-
-4. **`Src/analysis.py` uses inner merge only, which silently drops unmatched sectors**.
-  - This is acceptable for complete-case analysis, but it should be explicitly logged as sample selection (who is dropped and why).
-
-5. **No explicit robustness/sensitivity checks are automated**.
-  - The project currently uses one sparsification threshold (`a_ij >= 0.01`) and one quadrant cutoff (`0.5`) without scripted sensitivity tables.
-
-## Improvement Roadmap
-
-The following improvements would make the project stronger both econometrically and computationally:
-
-1. **Harmonize and externalize the crosswalk**.
-  - Keep a single source of truth in `Resources/sector_concordance_icio_to_euklems.csv` and load it from both Python and JavaScript.
-
-2. **Fix weighted betweenness construction**.
-  - Use an explicit edge-distance variable like `distance = 1 / weight` (with safeguards for near-zero values), then compute shortest-path-based centrality on that distance.
-
-3. **Add a robustness block**.
-  - Recompute results for multiple sparsification thresholds (for example 0.005, 0.01, 0.02) and alternative quadrant rules (median split, quantile split).
-
-4. **Add temporal and partial-correlation analysis**.
-  - Include lagged correlations and partial correlations controlling for sector size proxies where available.
-
-5. **Refactor scripts into reusable pipeline functions**.
-  - Add `if __name__ == "__main__":` entry points and structured logging to document dropped rows, merge coverage, and final sample size by year.
-
-6. **Add a compact validation report**.
-  - Automatically save: number of sectors matched by year, unmatched ICIO/NACE codes, and stability of top-ranked sectors across years.
-
+To view the dashboard, open `dashboard/index.html` in your browser (or serve via `python -m http.server 8000` and open `/dashboard/index.html`).
