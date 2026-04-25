@@ -62,38 +62,36 @@ def load_zblock_csv(path: Path) -> pd.DataFrame:
 def preprocess_digitalisation(year: int, data_proc: Path, nace_to_icio: dict) -> pd.DataFrame:
     """Load and crosswalk both digitalisation measures for Italy for a given year.
 
-    Applies the NACE→ICIO crosswalk to EUKLEMS growth accounts (ICT share)
-    and Intan-Invest intangibles (digital intensity = software+R&D / VA).
-    Tracks whether each ICIO code's ICT value comes from a direct NACE match
-    or an aggregate mapping (ict_share_source column); aggregate-source
+    Applies the NACE→ICIO crosswalk to EUKLEMS growth accounts (digital capital
+    contribution) and Intan-Invest intangibles (digital capital depth = K_Soft_DB / VA_CP).
+    Tracks whether each ICIO code's contribution value comes from a direct NACE match
+    or an aggregate mapping (dig_contribution_source column); aggregate-source
     sectors are less reliable for Variant B classification.
     Returns an empty DataFrame if input files are missing.
     """
     growth_path = data_proc / f"growth_accounts_{year}_wide.csv"
     intang_path = data_proc / f"intangibles_analytical_{year}.csv"
 
-    # --- ICT share (EUKLEMS) ---
+    # --- Digital capital contribution (EUKLEMS statistical module) ---
     growth_df = pd.read_csv(growth_path, low_memory=False)
     growth_it = growth_df[growth_df["geo_code"] == "IT"].copy()
     growth_it["icio_code"] = growth_it["nace_r2_code"].map(nace_to_icio)
-    growth_it = growth_it.explode("icio_code").dropna(subset=["icio_code", "ict_share"])
+    growth_it = growth_it.explode("icio_code").dropna(subset=["icio_code", "dig_contribution"])
     growth_it["is_direct"] = growth_it["nace_r2_code"] == growth_it["icio_code"]
-    ict_by_sector = growth_it.groupby("icio_code", as_index=False).agg(
-        ict_share=("ict_share", "mean"),
-        ict_share_source=("is_direct", lambda x: "direct" if x.any() else "aggregate"),
+    contrib_by_sector = growth_it.groupby("icio_code", as_index=False).agg(
+        dig_contribution=("dig_contribution", "mean"),
+        dig_contribution_source=("is_direct", lambda x: "direct" if x.any() else "aggregate"),
     )
 
-    # --- Digital intensity (Intan-Invest) ---
+    # --- Digital capital depth (Intan-Invest analytical module) ---
     intang_df = pd.read_csv(intang_path, low_memory=False)
     intang_it = intang_df[intang_df["geo_code"] == "IT"].copy()
-    intang_it["dig_intensity"] = (
-        intang_it["I_Soft_DB"].fillna(0.0) + intang_it["I_RD"].fillna(0.0)
-    ) / intang_it["VA_CP"].replace(0, np.nan)
+    intang_it["dig_depth"] = intang_it["K_Soft_DB"] / intang_it["VA_CP"].replace(0, np.nan)
     intang_it["icio_code"] = intang_it["nace_r2_code"].map(nace_to_icio)
-    intang_it = intang_it.explode("icio_code").dropna(subset=["icio_code", "dig_intensity"])
-    dig_by_sector = intang_it.groupby("icio_code", as_index=False)["dig_intensity"].mean()
+    intang_it = intang_it.explode("icio_code").dropna(subset=["icio_code", "dig_depth"])
+    depth_by_sector = intang_it.groupby("icio_code", as_index=False)["dig_depth"].mean()
 
-    df_composite = ict_by_sector.merge(dig_by_sector, on="icio_code", how="outer")
-    df_composite["dig_intensity_norm"] = minmax(df_composite["dig_intensity"])
-    df_composite["ict_share_norm"] = minmax(df_composite["ict_share"])
+    df_composite = contrib_by_sector.merge(depth_by_sector, on="icio_code", how="outer")
+    df_composite["dig_contribution_norm"] = minmax(df_composite["dig_contribution"])
+    df_composite["dig_depth_norm"] = minmax(df_composite["dig_depth"])
     return df_composite
