@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Digital Transition & Supply-Chain Structure - Italy</title>
+<link rel="stylesheet" href="styles.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="data.bundle.js"></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+
+<header>
+  <h1>Digital Transition &amp; Supply-Chain Structure<br><span>in the Italian Economy</span></h1>
+  <div class="header-meta">
+    Internet and Network Economics - 2025-2026<br>
+    OECD ICIO - EUKLEMS &amp; INTANProd<br>
+    49 sectors - 2016-2021
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="switchView('rankings',this)">Digitalisation rankings</button>
+  <button onclick="switchView('correlation',this)">Spearman correlation</button>
+  <button onclick="switchView('quadrant',this)">Quadrant classification</button>
+</nav>
+
+<div class="controls">
+  <label>Year</label>
+  <select id="year-sel" onchange="onYearChange()">
+    <option>2016</option><option>2017</option><option>2018</option>
+    <option>2019</option><option>2020</option><option selected>2021</option>
+  </select>
+  <label id="proxy-label">Proxy</label>
+  <div class="pill-group">
+    <div class="pill active" id="pill-ict" onclick="setProxy('ict')">ICT capital share</div>
+    <div class="pill" id="pill-dig" onclick="setProxy('dig')">Digital intensity</div>
+  </div>
+  <span id="load-msg">Loading data...</span>
+</div>
+
+<main>
+  <div id="status">Loading CSV files from ../data/processed/ ...</div>
+
+  <div class="view" id="view-rankings">
+    <div class="card">
+      <div class="card-title">Top 10 sectors by digitalisation</div>
+      <div class="card-sub" id="bar-sub">Unscaled raw values</div>
+      <div class="chart-row">
+        <div class="chart-wrap"><canvas id="bar-ict" height="360"></canvas></div>
+        <div class="chart-wrap"><canvas id="bar-dig" height="360"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="view-correlation">
+    <div class="card">
+      <div class="card-title">Spearman rank correlation over time</div>
+      <div class="card-sub">PageRank vs. each digitalisation proxy - 95% confidence interval - 2016-2021</div>
+      <div class="chart-row">
+        <div class="chart-wrap"><canvas id="corr-ict" height="300"></canvas></div>
+        <div class="chart-wrap"><canvas id="corr-dig" height="300"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="view-quadrant">
+    <div class="card">
+      <div class="card-title">Centrality-digitalisation quadrant map</div>
+      <div class="card-sub" id="quad-sub">Fixed threshold at 0.5 on both normalised axes</div>
+      <div style="max-width:680px;margin:0 auto;">
+        <canvas id="quad-chart" height="500"></canvas>
+      </div>
+      <div class="q-legend">
+        <div class="q-legend-item"><div class="q-dot" style="background:var(--hh)"></div>HH - High centrality / High digital</div>
+        <div class="q-legend-item"><div class="q-dot" style="background:var(--hl)"></div>HL - High centrality / Low digital</div>
+        <div class="q-legend-item"><div class="q-dot" style="background:var(--lh)"></div>LH - Low centrality / High digital</div>
+        <div class="q-legend-item"><div class="q-dot" style="background:var(--ll)"></div>LL - Low centrality / Low digital</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+</body>
+</html>
