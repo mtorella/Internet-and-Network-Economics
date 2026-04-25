@@ -46,14 +46,32 @@ for year in YEARS:
 
 panel = pd.concat(data_frames.values(), ignore_index=True)
 
+# Standardise all metrics globally using z-scores (across all years and sectors).
+# No normalisation is applied earlier in the pipeline: steps 1 and 2
+# intentionally store only raw values so that this is the single authoritative
+# standardisation step.
+# z = (x - mean) / std, computed over all 6 years × 49 sectors combined.
+# The natural quadrant split is z = 0 (above/below the global mean), which is
+# independent of the range and unaffected by negative values or outliers —
+# the two problems that made min-max unsuitable.
+def zscore_global(s: pd.Series) -> pd.Series:
+    mu, sigma = s.mean(), s.std(ddof=1)
+    return (s - mu) / sigma if sigma > 0 else pd.Series(0.0, index=s.index)
+
+for _raw in ["pagerank", "betweenness", "dig_contribution", "dig_depth"]:
+    if _raw in panel.columns:
+        panel[f"{_raw}_norm"] = zscore_global(panel[_raw])
+
+print(f"Global z-score standardisation applied across {len(YEARS)} years × {panel.groupby('year').size().iloc[0]} sectors.")
+
 PAIRS = [
-    ("ict_share_norm", "ICT capital share (norm.)"),
-    ("dig_intensity_norm", "Digital intensity (norm.)"),
+    ("dig_contribution_norm", "Digital contribution (norm.)"),
+    ("dig_depth_norm", "Digital depth (norm.)"),
 ]
 
 BAR_PAIRS = [
-    ("ict_share", "ICT capital share"),
-    ("dig_intensity", "Digital intensity"),
+    ("dig_contribution", "Digital contribution"),
+    ("dig_depth", "Digital depth"),
 ]
 
 # ── Figure 1: Bar charts ───────────────────────────────────────────────────
@@ -138,7 +156,7 @@ QUADRANT_LABELS = {
 # Fixed split at 0.5: midpoint of the [0,1] min-max scale.
 # Using the mean would shift the threshold with the distribution each year,
 # making quadrant membership incomparable across years.
-QUADRANT_THRESHOLD = 0.5
+QUADRANT_THRESHOLD = 0.0  # z = 0 is the global mean; above = high, below = low
 
 
 def assign_quadrant(row, col):
@@ -202,8 +220,8 @@ TABLE_COLS = [
     "icio_code",
     "pagerank", "pagerank_norm", "betweenness", "betweenness_norm",
     "in_strength", "out_strength",
-    "ict_share", "ict_share_norm",
-    "dig_intensity", "dig_intensity_norm",
+    "dig_contribution", "dig_contribution_norm",
+    "dig_depth", "dig_depth_norm",
 ]
 
 for year in YEARS:

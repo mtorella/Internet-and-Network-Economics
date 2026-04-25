@@ -1,6 +1,6 @@
 from pathlib import Path
 import pandas as pd
-from utils.helpers import extract_zblock, minmax
+from utils.helpers import extract_zblock
 from utils.constants import NACE_EXCLUDED
 
 # Paths and constants
@@ -76,10 +76,6 @@ for year in YEARS:
     # Select only NACE codes and digitalisation variables
     df_digitalisation = df_digitalisation[KEY_COLS + ["dig_contribution", "dig_depth"]]
 
-    # Normalise digitalisation metrics to [0,1] range for comparability
-    df_digitalisation["dig_contribution_norm"] = minmax(df_digitalisation["dig_contribution"])
-    df_digitalisation["dig_depth_norm"] = minmax(df_digitalisation["dig_depth"])
-
     # Add year column for clarity
     df_digitalisation["year"] = year
 
@@ -107,7 +103,7 @@ for year in YEARS:
         print(f"{year}: Z-block extraction failed — skipped")
         continue
 
-    z_block.to_csv(PROCESSED_DIR / f"icio_zblock_{year}.csv", index_label="")
-    print(f"{year}: saved icio_zblock_{year}.csv — {z_block.shape}")
+    z_block.to_parquet(PROCESSED_DIR / f"icio_zblock_{year}.parquet")
+    print(f"{year}: saved icio_zblock_{year}.parquet — {z_block.shape}")
 
 print("\nPreprocessing complete. Processed files saved to 'data/processed/'.")

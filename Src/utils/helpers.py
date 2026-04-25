@@ -7,10 +7,6 @@ import pandas as pd
 
 from utils.constants import ICIO_SECTOR_CODES
 
-def minmax(s: pd.Series) -> pd.Series:
-    lo, hi = s.min(), s.max()
-    return (s - lo) / (hi - lo) if hi > lo else pd.Series(0.0, index=s.index)
-
 def extract_zblock(raw_df: pd.DataFrame) -> pd.DataFrame:
     """Isolate the Z-block from a raw ICIO DataFrame — square intermediate-transactions matrix."""
     intermediate_cols = [c for c in raw_df.columns if "_" in c and c.split("_", 1)[1] in ICIO_SECTOR_CODES]
@@ -92,6 +88,4 @@ def preprocess_digitalisation(year: int, data_proc: Path, nace_to_icio: dict) ->
     depth_by_sector = intang_it.groupby("icio_code", as_index=False)["dig_depth"].mean()
 
     df_composite = contrib_by_sector.merge(depth_by_sector, on="icio_code", how="outer")
-    df_composite["dig_contribution_norm"] = minmax(df_composite["dig_contribution"])
-    df_composite["dig_depth_norm"] = minmax(df_composite["dig_depth"])
     return df_composite

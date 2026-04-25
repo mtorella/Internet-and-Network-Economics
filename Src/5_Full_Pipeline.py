@@ -1,20 +1,15 @@
 """Full pipeline runner — executes all four steps in order:
-  1. preprocessing.py
-  2. network_centrality.py
-  3. analysis.py
-  4. build_dashboard_bundle.py
+  1. 1_preprocessing.py
+  2. 2_network_centrality.py
+  3. 3_analysis.py
+  4. 4_build_dashboard_bundle.py
 """
 
 import subprocess
 import sys
 from pathlib import Path
 
-STEPS = [
-    "preprocessing.py",
-    "network_centrality.py",
-    "analysis.py",
-    "build_dashboard_bundle.py",
-]
+STEPS = ["1_preprocessing.py", "2_network_centrality.py", "3_analysis.py", "4_build_dashboard_bundle.py"]
 
 SRC = Path(__file__).resolve().parent
 
@@ -22,10 +17,7 @@ def run_step(script: str) -> None:
     print(f"\n{'='*60}")
     print(f"Running {script}")
     print('='*60)
-    result = subprocess.run(
-        [sys.executable, str(SRC / script)],
-        cwd=SRC,
-    )
+    result = subprocess.run([sys.executable, str(SRC / script)], cwd=SRC)
     if result.returncode != 0:
         print(f"\nPipeline aborted: {script} exited with code {result.returncode}.")
         sys.exit(result.returncode)

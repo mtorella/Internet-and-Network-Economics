@@ -16,7 +16,7 @@ Centrality measures:
 from pathlib import Path
 import networkx as nx
 import pandas as pd
-from utils.helpers import build_coefficient_graph, load_zblock_csv, minmax
+from utils.helpers import build_coefficient_graph
 
 ROOT = Path(__file__).resolve().parent.parent
 PROCESSED_DIR = ROOT / "data" / "processed"
@@ -26,9 +26,9 @@ YEARS = list(range(2016, 2022))
 # Iterate over years, build graph, compute centrality, and store Italian sectors
 for year in YEARS:
     # Load Z-block and build graph
-    zblock_path = PROCESSED_DIR / f"icio_zblock_{year}.csv"
+    zblock_path = PROCESSED_DIR / f"icio_zblock_{year}.parquet"
     print(f"{year}: loading Z-block ...", end=" ", flush=True)
-    z_block = load_zblock_csv(zblock_path)
+    z_block = pd.read_parquet(zblock_path)
     G = build_coefficient_graph(z_block)
     print(f"{G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
 
@@ -48,8 +48,6 @@ for year in YEARS:
         "in_strength": [in_str[n] for n in ita_nodes],
         "out_strength": [out_str[n] for n in ita_nodes],
     })
-    df_year["pagerank_norm"] = minmax(df_year["pagerank"])
-    df_year["betweenness_norm"] = minmax(df_year["betweenness"])
     df_year["year"] = year
 
     # Store in a file
