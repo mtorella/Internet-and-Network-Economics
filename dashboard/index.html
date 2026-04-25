@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Digital Transition & Supply-Chain Structure - Italy</title>
+<title>Digital Transition &amp; Supply-Chain Structure — Italy</title>
 <link rel="stylesheet" href="styles.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -13,11 +13,13 @@
 <body>
 
 <header>
-  <h1>Digital Transition &amp; Supply-Chain Structure<br><span>in the Italian Economy</span></h1>
+  <div>
+    <h1>Digital Transition &amp; Supply-Chain Structure<br><span>in the Italian Economy</span></h1>
+  </div>
   <div class="header-meta">
-    Internet and Network Economics - 2025-2026<br>
-    OECD ICIO - EUKLEMS &amp; INTANProd<br>
-    49 sectors - 2016-2021
+    Internet and Network Economics &middot; 2025&ndash;2026<br>
+    OECD ICIO &middot; EUKLEMS &amp; INTANProd<br>
+    49 sectors &middot; 2016&ndash;2021
   </div>
 </header>
 
@@ -25,59 +27,122 @@
   <button class="active" onclick="switchView('rankings',this)">Digitalisation rankings</button>
   <button onclick="switchView('correlation',this)">Spearman correlation</button>
   <button onclick="switchView('quadrant',this)">Quadrant classification</button>
+  <button onclick="switchView('table',this)">Sector data</button>
 </nav>
 
 <div class="controls">
-  <label>Year</label>
-  <select id="year-sel" onchange="onYearChange()">
-    <option>2016</option><option>2017</option><option>2018</option>
-    <option>2019</option><option>2020</option><option selected>2021</option>
-  </select>
-  <label id="proxy-label">Proxy</label>
-  <div class="pill-group">
-    <div class="pill active" id="pill-ict" onclick="setProxy('ict')">ICT capital share</div>
-    <div class="pill" id="pill-dig" onclick="setProxy('dig')">Digital intensity</div>
+  <div id="ctrl-year" class="ctrl-group">
+    <label>Year</label>
+    <select id="year-sel" onchange="onYearChange()">
+      <option>2016</option><option>2017</option><option>2018</option>
+      <option>2019</option><option>2020</option><option selected>2021</option>
+    </select>
   </div>
-  <span id="load-msg">Loading data...</span>
+
+  <div id="ctrl-proxy" class="ctrl-group">
+    <label>Proxy</label>
+    <div class="pill-group">
+      <div class="pill active" id="pill-contribution" onclick="setProxy('contribution')">Digital contribution</div>
+      <div class="pill"        id="pill-depth"        onclick="setProxy('depth')">Digital depth</div>
+    </div>
+  </div>
+
+  <div id="ctrl-scale" class="ctrl-group">
+    <label>Scale</label>
+    <div class="pill-group">
+      <div class="pill active" id="pill-raw"  onclick="setScale('raw')">Raw</div>
+      <div class="pill"        id="pill-norm" onclick="setScale('norm')">z-score</div>
+    </div>
+  </div>
+
+  <span id="load-msg">Loading data&hellip;</span>
 </div>
 
 <main>
-  <div id="status">Loading CSV files from ../data/processed/ ...</div>
+  <div id="status"><span class="spinner"></span>&ensp;Loading data&hellip;</div>
 
+  <div id="kpi-strip"></div>
+
+  <!-- Rankings -->
   <div class="view" id="view-rankings">
     <div class="card">
       <div class="card-title">Top 10 sectors by digitalisation</div>
-      <div class="card-sub" id="bar-sub">Unscaled raw values</div>
+      <div class="card-sub" id="bar-sub">Top 10 by each proxy, highest at top</div>
       <div class="chart-row">
-        <div class="chart-wrap"><canvas id="bar-ict" height="360"></canvas></div>
-        <div class="chart-wrap"><canvas id="bar-dig" height="360"></canvas></div>
+        <div class="chart-wrap"><canvas id="bar-contribution" height="360"></canvas></div>
+        <div class="chart-wrap"><canvas id="bar-depth" height="360"></canvas></div>
       </div>
     </div>
   </div>
 
+  <!-- Correlation -->
   <div class="view" id="view-correlation">
     <div class="card">
       <div class="card-title">Spearman rank correlation over time</div>
-      <div class="card-sub">PageRank vs. each digitalisation proxy - 95% confidence interval - 2016-2021</div>
+      <div class="card-sub">
+        PageRank vs each digitalisation proxy · 2016&ndash;2021 · 95% CI (Fisher <i>z</i>-transform) ·
+        Active proxy highlighted · Spearman is rank-based: raw and normalised inputs give identical <i>r</i>
+      </div>
+      <div class="info-banner">
+        <strong>Statistical note.</strong>
+        With n&nbsp;&asymp;&nbsp;44&ndash;49 the critical value at &alpha;&nbsp;=&nbsp;0.05 (two-tailed) is
+        |<i>r</i>|&nbsp;&asymp;&nbsp;0.30. Hover a data point to see whether that year&rsquo;s estimate
+        exceeds the threshold. Because all observed correlations are close to zero and the 95% CI includes
+        zero in every year, none of the associations are statistically significant.
+      </div>
       <div class="chart-row">
-        <div class="chart-wrap"><canvas id="corr-ict" height="300"></canvas></div>
-        <div class="chart-wrap"><canvas id="corr-dig" height="300"></canvas></div>
+        <div class="chart-wrap"><canvas id="corr-contribution" height="300"></canvas></div>
+        <div class="chart-wrap"><canvas id="corr-depth" height="300"></canvas></div>
       </div>
     </div>
   </div>
 
+  <!-- Quadrant -->
   <div class="view" id="view-quadrant">
     <div class="card">
-      <div class="card-title">Centrality-digitalisation quadrant map</div>
-      <div class="card-sub" id="quad-sub">Fixed threshold at 0.5 on both normalised axes</div>
-      <div style="max-width:680px;margin:0 auto;">
-        <canvas id="quad-chart" height="500"></canvas>
+      <div class="card-title">Centrality&ndash;digitalisation quadrant map</div>
+      <div class="card-sub" id="quad-sub">Fixed threshold at 0.5 · within-year normalisation · hover for details</div>
+      <div class="info-banner">
+        <strong>Standardisation note.</strong>
+        Both axes are <em>global z-scores</em> computed over the full 2016&ndash;2021 panel
+        (294&nbsp;sector-year observations): <i>z&nbsp;=&nbsp;(x&nbsp;&minus;&nbsp;&mu;)&nbsp;/&nbsp;&sigma;</i>.
+        The split threshold is <strong>z&nbsp;=&nbsp;0</strong> (the global mean), so &ldquo;High&rdquo; means
+        above-average across all years, not just within the current year. Quadrant membership is directly
+        comparable across years. Typical range is roughly &minus;3 to +3; large positive z-scores indicate
+        outliers. Use the Sector&nbsp;data tab to inspect raw values.
       </div>
+      <div class="quad-wrap"><canvas id="quad-chart"></canvas></div>
       <div class="q-legend">
-        <div class="q-legend-item"><div class="q-dot" style="background:var(--hh)"></div>HH - High centrality / High digital</div>
-        <div class="q-legend-item"><div class="q-dot" style="background:var(--hl)"></div>HL - High centrality / Low digital</div>
-        <div class="q-legend-item"><div class="q-dot" style="background:var(--lh)"></div>LH - Low centrality / High digital</div>
-        <div class="q-legend-item"><div class="q-dot" style="background:var(--ll)"></div>LL - Low centrality / Low digital</div>
+        <div class="q-legend-item"><div class="q-dot" style="background:var(--hh)"></div>HH &mdash; High centrality / High digital</div>
+        <div class="q-legend-item"><div class="q-dot" style="background:var(--hl)"></div>HL &mdash; High centrality / Low digital</div>
+        <div class="q-legend-item"><div class="q-dot" style="background:var(--lh)"></div>LH &mdash; Low centrality / High digital</div>
+        <div class="q-legend-item"><div class="q-dot" style="background:var(--ll)"></div>LL &mdash; Low centrality / Low digital</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="view" id="view-table">
+    <div class="card">
+      <div class="card-title">Sector data panel</div>
+      <div class="card-sub" id="tbl-sub">Sorted by raw PageRank</div>
+      <div class="tbl-scroll">
+        <table id="sector-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Code</th>
+              <th>Sector</th>
+              <th>PageRank</th>
+              <th>PageRank (norm.)</th>
+              <th>Dig. contribution</th>
+              <th>Dig. depth</th>
+              <th>Quadrant (contribution)</th>
+              <th>Quadrant (depth)</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-body"></tbody>
+        </table>
       </div>
     </div>
   </div>
