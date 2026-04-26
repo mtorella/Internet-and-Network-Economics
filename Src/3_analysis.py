@@ -58,7 +58,7 @@ def zscore_global(s: pd.Series) -> pd.Series:
     mu, sigma = s.mean(), s.std(ddof=1)
     return (s - mu) / sigma if sigma > 0 else pd.Series(0.0, index=s.index)
 
-for _raw in ["pagerank", "betweenness", "dig_contribution", "dig_depth"]:
+for _raw in ["pagerank", "betweenness", "in_strength", "out_strength", "dig_contribution", "dig_depth"]:
     if _raw in panel.columns:
         panel[f"{_raw}_norm"] = zscore_global(panel[_raw])
 
@@ -219,7 +219,7 @@ for year in YEARS:
 TABLE_COLS = [
     "icio_code",
     "pagerank", "pagerank_norm", "betweenness", "betweenness_norm",
-    "in_strength", "out_strength",
+    "in_strength", "in_strength_norm", "out_strength", "out_strength_norm",
     "dig_contribution", "dig_contribution_norm",
     "dig_depth", "dig_depth_norm",
 ]

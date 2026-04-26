@@ -43,7 +43,7 @@ The two proxies are complementary by construction. `dig_contribution` is dynamic
 
 **Coverage note.** `dig_contribution` is available for all 58 Italian sectors in the growth accounts data. `dig_depth` is available for 49 of those 58 sectors; the remaining 9 — concentrated in distribution (G45, G46, G47), transport (H49–H53) and real estate (L68A) — lack a reliable capital stock estimate from the analytical module's perpetual inventory method. Both proxies are retained in the processed files with missing values where applicable. Sectors missing `dig_depth` are included in any analysis that uses `dig_contribution` alone, and are dropped only from analyses that require both metrics jointly.
 
-Both proxies are normalised to the unit interval using min-max scaling before any comparison or visualisation, so that differences in units and scale do not drive the results.
+Both proxies are normalised using global z-score standardisation before any comparison or visualisation, so that differences in units and scale do not drive the results. See the [Normalisation](#normalisation) section below for details.
 
 ## Crosswalk: NACE to ICIO
 
@@ -75,10 +75,10 @@ We use ICIO codes as the canonical identifier, since it is much easier to aggreg
 
 In the current codebase, the crosswalk is implemented as a dictionary mapping **ICIO to NACE** in `Src/utils/constants.py` (`ICIO_TO_NACE`), for instance:
 
-  "C26": "C26"          # one-to-one
-  "A01": "A"            # many ICIO sectors map to one NACE aggregate
-  "A02": "A"
-  "A03": "A"
+| ICIO code | NACE code | Mapping type |
+|---|---|---|
+|C26|C26|one-to-one|
+|A01, A02, A03|A|many-to-one|
 
 So the implemented logic is many-to-one at the code-system level (multiple ICIO sectors can map to one NACE code), but the dictionary direction is ICIO -> NACE. ICIO sectors with no NACE match in the EUKLEMS Italy data appear in the centrality panel with missing digitalisation values.
 
@@ -113,7 +113,32 @@ Four centrality measures are computed for every node in each annual graph. All m
 
 - **In-strength** and **out-strength**: the sum of incoming and outgoing edge weights for each node, respectively. In-strength measures how intensively a sector draws on other sectors as suppliers; out-strength measures how intensively it supplies inputs to others.
 
-PageRank and betweenness are additionally normalised to the unit interval using within-year min-max scaling, producing `pagerank_norm` and `betweenness_norm`. This facilitates visual comparison across sectors within a given year. Normalised values should not be compared across years, as the scaling is performed independently for each annual graph.
+PageRank and betweenness are additionally normalised using global z-score standardisation (across all years jointly), producing `pagerank_norm` and `betweenness_norm`. This facilitates cross-year comparison on a common scale. See the [Normalisation](#normalisation) section below for details.
+
+## Normalisation
+
+Before any comparison or visualisation, all continuous metrics — digitalisation proxies and centrality measures alike — are standardised using **global z-score normalisation**:
+
+$$z_{s,t} = \frac{x_{s,t} - \bar{x}}{\sigma_x}$$
+
+where $\bar{x}$ and $\sigma_x$ are the mean and standard deviation computed over the full pooled sample (all sectors $s$ and all years $t$ jointly). This produces variables with mean zero and unit variance across the entire panel.
+
+### Why global z-scores rather than within-year min-max
+
+An earlier version of the analysis used within-year min-max scaling ($[0, 1]$) applied separately for each year. That approach had two drawbacks:
+
+- **Incomparability across years.** Min-max compresses each year's distribution into $[0, 1]$ independently, so a value of $0.8$ in 2016 and $0.8$ in 2021 carry no common meaning. A sector that became more digitalised over time could show a stable or even declining normalised value if other sectors digitalised faster.
+- **Sensitivity to outliers.** Min-max assigns values of exactly 0 and 1 to the annual minimum and maximum, so a single extreme observation can compress all other sectors toward the middle of the scale.
+
+Global z-scores resolve both issues: the scaling parameters are fixed across the panel, so all years and sectors are placed on the same reference frame, and the mean/standard deviation are much more robust to isolated outliers than the range.
+
+### What normalised values mean
+
+- A sector with $z > 0$ is **above the global average** for that variable.
+- A sector with $z < 0$ is **below the global average**.
+- The natural quadrant split is $z = 0$: sectors above and below the global mean on both axes.
+
+The normalised variables (`pagerank_norm`, `betweenness_norm`, `dig_contribution_norm`, `dig_depth_norm`) are used for all visualisations and the Spearman correlation analysis. Raw values are preserved in the output files for reference.
 
 ## Analysis
 
@@ -129,54 +154,82 @@ The statistical relationship between supply-chain centrality and digitalisation 
 
 $$z = \text{arctanh}(r), \quad \text{SE}(z) = \frac{1}{\sqrt{n-3}}, \quad \text{CI} = \left[\tanh(z - z_{0.025} \cdot \text{SE}),\ \tanh(z + z_{0.025} \cdot \text{SE})\right]$$
 
-Spearman rank correlation is used rather than Pearson because both the centrality and digitalisation distributions are right-skewed, and the research question concerns monotonic association rather than a linear one. Because Spearman operates on ranks, the choice of min-max normalisation does not affect the results; the normalised and raw series yield identical coefficients.
+Spearman rank correlation is used rather than Pearson because both the centrality and digitalisation distributions are right-skewed, and the research question concerns monotonic association rather than a linear one. Because Spearman operates on ranks, the choice of normalisation method does not affect the results; the normalised and raw series yield identical coefficients.
 
 ### Quadrant Classification
 
-Each year, sectors are classified into four quadrants based on their joint position in the centrality-digitalisation space. The split is applied at a fixed threshold of 0.5 on the normalised scale for both axes:
+Each year, sectors are classified into four quadrants based on their joint position in the centrality-digitalisation space. The split is applied at $z = 0$, i.e. the global mean, for both axes:
 
 | Quadrant | Centrality | Digitalisation |
 |---|---|---|
-| HH | $\geq 0.5$ | $\geq 0.5$ |
-| HL | $\geq 0.5$ | $< 0.5$ |
-| LH | $< 0.5$ | $\geq 0.5$ |
-| LL | $< 0.5$ | $< 0.5$ |
+| HH | $\geq 0$ | $\geq 0$ |
+| HL | $\geq 0$ | $< 0$ |
+| LH | $< 0$ | $\geq 0$ |
+| LL | $< 0$ | $< 0$ |
 
-A fixed threshold is used rather than the sample mean to ensure that quadrant boundaries do not shift with the distribution from year to year, which would make quadrant membership incomparable across the panel. The value 0.5 corresponds to the midpoint of the min-max normalised range and has a natural interpretation: a sector is classified as high if its value lies in the upper half of the observed range for that year.
+The threshold $z = 0$ corresponds to the pooled global mean across all six years and 49 sectors. It is a natural and stable split: a sector is classified as "high" if it is above the global average for that variable, regardless of year. Because z-score standardisation is performed globally (not within each year), this threshold is consistent across the panel and does not shift with the annual distribution.
 
 ## Results and Economic Interpretation
 
 This section reports the main outputs directly from the generated figures and tables.
 
+### Spearman Correlation Over Time
+
 ![Spearman correlation over time](outputs/figures/fig_correlation.png)
+
+The panel tracks, for each year from 2016 to 2021, the Spearman rank correlation between normalised PageRank (supply-chain centrality) and each of the two digitalisation proxies. The contribution correlation oscillates around zero, with a slight positive value in 2016 that fades and turns modestly negative through 2021. The depth correlation follows a more pronounced downward trajectory, reaching $\rho \approx -0.27$ in 2021. Neither proxy shows a sustained positive association between centrality and digitalisation over the sample period.
+
+### Top-10 Digitalisation Rankings — 2021
 
 ![Top-10 digitalisation sectors in 2021](outputs/figures/fig_bars_2021.png)
 
+**Left panel — Digital capital contribution (`dig_contribution`):** This proxy captures how much software and database capital services contributed to value-added growth in that year. The top three sectors in 2021 are Motor vehicles (`C29`), Building and repairing of ships (`C301`), and Other transport equipment (`C302T309`), all recording the same peak value. This is somewhat surprising: transport manufacturing is not conventionally considered a software-intensive industry. The high contribution likely reflects exceptional ICT investment flows in a post-pandemic recovery year rather than a structural feature of these sectors. IT services and data activities (`J62_63`) and Publishing, audiovisual and broadcasting (`J58T60`) also appear in the top 5 — a more expected result, given that these are intrinsically digital sectors.
+
+**Right panel — Digital capital depth (`dig_depth`):** This proxy measures accumulated software and database capital relative to value added. The top positions are entirely dominated by mining and extraction sectors: Coal mining (`B05`), Oil and gas extraction (`B06`), Other mining (`B08`), Mining support services (`B09`), and Metal ore mining (`B07`) all share the highest depth value. This is a surprising finding. Mining sectors are not typically associated with high digital intensity, but their elevated depth ratio likely reflects a combination of a large accumulated ICT stock (e.g. for geological sensing, remote monitoring and process control) and a relatively modest value-added denominator, inflating the ratio. Electricity and gas supply (`D`) ranks sixth, which is more expected given the digital infrastructure requirements of modern energy networks.
+
+### Centrality-Digitalisation Quadrants — 2021
+
 ![Centrality-digitalisation quadrants in 2021](outputs/figures/fig_quadrants_2021.png)
 
-### Consolidated Results Table (2016-2021)
+The scatter plots confirm visually that no strong positive diagonal pattern emerges. In the contribution panel, the highest-centrality sectors (Public administration `O`, Professional services `M`, IT services `J62_63`) are scattered across quadrants, and several of the most digitalised sectors by contribution (transport manufacturing) sit below the global centrality mean. In the depth panel, the mining sectors with the highest depth are all below-average in centrality, placing them in the LH quadrant.
 
-The table below is built from `outputs/tables/sector_panel_YYYY.csv` files. Correlations are Spearman between normalised PageRank and each digital proxy. Quadrant counts are reported as HH/HL/LH/LL and are computed on non-missing observations for each proxy.
+### Results Tables (2016–2021)
 
-| Year | N corr (contrib) | rho contrib | Quadrants contrib (HH/HL/LH/LL) | N corr (depth) | rho depth | Quadrants depth (HH/HL/LH/LL) |
-|---:|---:|---:|:---|---:|---:|:---|
-| 2016 | 44 | 0.133 | 0/0/2/42 | 44 | -0.031 | 0/0/35/9 |
-| 2017 | 44 | -0.053 | 0/0/3/41 | 44 | -0.056 | 0/0/35/9 |
-| 2018 | 44 | -0.081 | 0/1/4/39 | 44 | -0.006 | 1/0/34/9 |
-| 2019 | 44 | -0.038 | 0/0/4/40 | 44 | -0.001 | 0/0/36/8 |
-| 2020 | 44 | -0.006 | 0/0/2/42 | 44 | -0.122 | 0/0/34/10 |
-| 2021 | 44 | -0.076 | 2/5/3/34 | 22 | -0.269 | 3/0/11/8 |
+The tables below are built from `outputs/tables/sector_panel_YYYY.csv`. Correlations are Spearman between normalised PageRank and the respective digitalisation proxy. Quadrant counts (HH / HL / LH / LL) use $z = 0$ as the split on both axes, computed on non-missing observations. N is the number of sector-year pairs with valid data for both variables.
 
-### What the outputs show
+#### Digital Capital Contribution (`dig_contribution`)
 
-- Correlation panel: the contribution correlation is close to zero in every year except a mild positive value in 2016; the depth correlation becomes more negative in 2020-2021, with the lowest value in 2021.
-- 2021 bar chart: top digital contribution sectors are C29, C301 and C302T309, while top digital depth sectors are B06, B09 and B05.
-- 2021 quadrant chart: in the contribution panel, J58T60 and J62_63 are in HH, while C29/C301/C302T309 are in LH; in the depth panel, O, M and R are in HH, and several B sectors are LH.
-- Table confirmation: LL dominates in the contribution proxy for 2016-2020; LH dominates in the depth proxy in all years; 2021 is the only year where HH becomes non-zero for both proxies.
+Measures the contribution of software and database capital services to value-added growth in a given year (flow measure from the EUKLEMS Statistical Module).
+
+| Year | N | Spearman ρ | HH | HL | LH | LL |
+|---:|---:|---:|---:|---:|---:|---:|
+| 2016 | 44 | 0.133 | 5 | 11 | 5 | 23 |
+| 2017 | 44 | −0.053 | 6 | 10 | 10 | 18 |
+| 2018 | 44 | −0.081 | 5 | 12 | 15 | 12 |
+| 2019 | 44 | −0.038 | 10 | 9 | 11 | 14 |
+| 2020 | 44 | −0.006 | 3 | 16 | 2 | 23 |
+| 2021 | 44 | −0.076 | 6 | 14 | 9 | 15 |
+
+The correlation is close to zero in every year, with a slight positive value in 2016 that does not persist. HL (high centrality, low contribution) is the dominant pattern in most years, suggesting that structurally central sectors tend to sit below the global average for digital capital contribution. The LH count spikes in 2018–2019, driven by manufacturing sectors with above-average contribution but modest centrality.
+
+#### Digital Capital Depth (`dig_depth`)
+
+Measures the stock of software and database capital accumulated by a sector relative to its current-price value added (stock measure from the EUKLEMS Analytical Module). Coverage drops to 22 sectors in 2021 due to missing analytical module data for that year.
+
+| Year | N | Spearman ρ | HH | HL | LH | LL |
+|---:|---:|---:|---:|---:|---:|---:|
+| 2016 | 44 | −0.031 | 3 | 13 | 7 | 21 |
+| 2017 | 44 | −0.056 | 4 | 12 | 3 | 25 |
+| 2018 | 44 | −0.006 | 4 | 13 | 7 | 20 |
+| 2019 | 44 | −0.001 | 7 | 12 | 9 | 16 |
+| 2020 | 44 | −0.122 | 6 | 13 | 11 | 14 |
+| 2021 | 22 | −0.269 | 4 | 9 | 6 | 3 |
+
+The depth correlation is consistently negative and worsens over time, reaching $\rho = -0.269$ in 2021. This means sectors with a larger accumulated stock of digital capital tend to be *less* central in the supply chain — the opposite of what the network propagation hypothesis would predict. HL dominates across all years, indicating that the most structurally central sectors (e.g. wholesale trade, manufacturing hubs) maintain their network position without accumulating proportionally large digital capital stocks.
 
 ### Interpretation constrained to these outputs
 
-From the visible figures and the table above, centrality and digitalisation do not move together strongly or consistently across the sample period. The ranking and quadrant outputs show that the sectors leading digital contribution and depth are not the same sectors that repeatedly occupy the highest centrality positions.
+From the visible figures and the tables above, centrality and digitalisation do not move together strongly or consistently across the sample period. Neither proxy shows a sustained positive association with supply-chain centrality. The sectors that lead digital capital contribution in 2021 (transport manufacturing) are structurally peripheral, while the sectors with the deepest digital capital stock (mining and extraction) are also below-average in centrality. The most central sectors — wholesale trade, professional services, public administration — tend to sit in the HL quadrant, maintaining their structural importance independently of their digital intensity.
 
 ## Repository Structure and Execution
 

@@ -1,19 +1,36 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap');
 
 :root {
-  --navy:   #0F1B2D;
-  --blue:   #185FA5;
-  --blue-l: #4A9EDB;
-  --teal:   #1D9E75;
-  --sand:   #F5F3EE;
-  --muted:  #8A8880;
-  --border: #DDD9D0;
-  --hh: #1D9E75;
-  --hl: #D85A30;
-  --lh: #378ADD;
-  --ll: #BA7517;
+  --navy:   #0B1E1A;
+  --blue:   #0D5C4A;
+  --blue-l: #3D9E82;
+  --teal:   #1A7A64;
+  --sand:   #F0F5F3;
+  --muted:  #6A8E87;
+  --border: #C4D8D2;
+  --hh: #0D5C4A;
+  --hl: #1A567A;
+  --lh: #5A9E52;
+  --ll: #A07840;
   --radius: 10px;
-  --shadow: 0 1px 3px rgba(15,27,45,0.06), 0 4px 14px rgba(15,27,45,0.04);
+  --shadow: 0 1px 3px rgba(11,30,26,0.07), 0 4px 14px rgba(11,30,26,0.05);
+}
+
+/* ── Animations ──────────────────────────────────────────────────────────── */
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -34,6 +51,7 @@ header {
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
+  animation: slideDown 0.45s ease both;
 }
 
 header h1 {
@@ -64,6 +82,7 @@ nav {
   gap: 2px;
   border-top: 1px solid rgba(255,255,255,0.07);
   overflow-x: auto;
+  animation: slideDown 0.45s ease 0.08s both;
 }
 
 nav button {
@@ -93,6 +112,7 @@ nav button.active { color: #fff; border-bottom-color: var(--blue-l); }
   align-items: center;
   gap: 24px;
   flex-wrap: wrap;
+  animation: fadeIn 0.4s ease 0.15s both;
 }
 
 .ctrl-group {
@@ -153,7 +173,7 @@ nav button.active { color: #fff; border-bottom-color: var(--blue-l); }
 main { padding: 28px 48px 56px; }
 
 .view { display: none; }
-.view.active { display: block; }
+.view.active { display: block; animation: fadeUp 0.3s ease both; }
 
 .card {
   background: #fff;
@@ -162,7 +182,11 @@ main { padding: 28px 48px 56px; }
   padding: 28px 32px;
   margin-bottom: 20px;
   box-shadow: var(--shadow);
+  animation: fadeUp 0.4s ease both;
 }
+
+.card:nth-child(2) { animation-delay: 0.06s; }
+.card:nth-child(3) { animation-delay: 0.12s; }
 
 .card-title {
   font-family: 'DM Serif Display', serif;
@@ -233,7 +257,14 @@ main { padding: 28px 48px 56px; }
   flex: 1;
   min-width: 130px;
   box-shadow: var(--shadow);
+  animation: fadeUp 0.35s ease both;
 }
+
+.kpi-card:nth-child(1) { animation-delay: 0.18s; }
+.kpi-card:nth-child(2) { animation-delay: 0.23s; }
+.kpi-card:nth-child(3) { animation-delay: 0.28s; }
+.kpi-card:nth-child(4) { animation-delay: 0.33s; }
+.kpi-card:nth-child(5) { animation-delay: 0.38s; }
 
 .kpi-value {
   font-family: 'DM Serif Display', serif;
@@ -266,12 +297,12 @@ main { padding: 28px 48px 56px; }
 /* ── Info banner ─────────────────────────────────────────────────────────── */
 
 .info-banner {
-  background: #F0F5FB;
-  border: 1px solid #C8DAF0;
+  background: #EDF5F2;
+  border: 1px solid #B0CEC7;
   border-radius: 6px;
   padding: 10px 16px;
   font-size: 12px;
-  color: #3A4F6A;
+  color: #2A4A42;
   line-height: 1.6;
   margin-bottom: 20px;
 }

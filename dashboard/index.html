@@ -25,8 +25,9 @@
 
 <nav>
   <button class="active" onclick="switchView('rankings',this)">Digitalisation rankings</button>
-  <button onclick="switchView('correlation',this)">Spearman correlation</button>
   <button onclick="switchView('quadrant',this)">Quadrant classification</button>
+  <button onclick="switchView('correlation',this)">Spearman correlation</button>
+  <button onclick="switchView('strength',this)">Network strength</button>
   <button onclick="switchView('table',this)">Sector data</button>
 </nav>
 
@@ -121,6 +122,25 @@
     </div>
   </div>
 
+  <!-- Network strength -->
+  <div class="view" id="view-strength">
+    <div class="card">
+      <div class="card-title">Network strength — in-degree &amp; out-degree</div>
+      <div class="card-sub" id="strength-sub">Top 10 sectors by in-strength and out-strength · weighted sum of incoming/outgoing Leontief coefficients</div>
+      <div class="info-banner">
+        <strong>What are in-strength and out-strength?</strong>
+        In-strength measures how intensively a sector draws on other sectors as suppliers (sum of incoming edge weights).
+        Out-strength measures how intensively it supplies inputs to others (sum of outgoing edge weights).
+        Both are computed on the thresholded Leontief coefficient matrix (<i>a<sub>ij</sub> &ge; 0.01</i>).
+        Toggle between raw and z-score values using the Scale control.
+      </div>
+      <div class="chart-row">
+        <div class="chart-wrap"><canvas id="bar-in-strength" height="360"></canvas></div>
+        <div class="chart-wrap"><canvas id="bar-out-strength" height="360"></canvas></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Table -->
   <div class="view" id="view-table">
     <div class="card">
@@ -135,9 +155,13 @@
               <th>Sector</th>
               <th>PageRank</th>
               <th>PageRank (norm.)</th>
+              <th>In-strength</th>
+              <th>In-strength (norm.)</th>
+              <th>Out-strength</th>
+              <th>Out-strength (norm.)</th>
               <th>Dig. contribution</th>
               <th>Dig. depth</th>
-              <th>Quadrant (contribution)</th>
+              <th>Quadrant (contrib.)</th>
               <th>Quadrant (depth)</th>
             </tr>
           </thead>

@@ -98,6 +98,9 @@ function mergeYear(cent, dig) {
     return {
       icio_code: icio, sector_name: sectorName(icio), nace_r2_code: nace,
       pagerank: c.pagerank ?? null, pagerank_norm: c.pagerank_norm ?? null,
+      betweenness: c.betweenness ?? null, betweenness_norm: c.betweenness_norm ?? null,
+      in_strength: c.in_strength ?? null, in_strength_norm: c.in_strength_norm ?? null,
+      out_strength: c.out_strength ?? null, out_strength_norm: c.out_strength_norm ?? null,
       dig_contribution: d.dig_contribution ?? null,
       dig_contribution_norm: d.dig_contribution_norm ?? null,
       dig_depth: d.dig_depth ?? null,
@@ -155,7 +158,7 @@ function assignQ(pr, dig) {
   return "LL";
 }
 
-const Q_COL = {HH:"#1D9E75", HL:"#D85A30", LH:"#378ADD", LL:"#BA7517"};
+const Q_COL = {HH:"#0D5C4A", HL:"#1A567A", LH:"#5A9E52", LL:"#A07840"};
 const Q_LABEL = {
   HH:"High centrality / High digital", HL:"High centrality / Low digital",
   LH:"Low centrality / High digital",  LL:"Low centrality / Low digital"
@@ -280,6 +283,16 @@ function renderKPIs(year) {
         <div class="kpi-label">${Q_LABEL[q]}</div>
       </div>`).join("");
 
+  } else if (currentView === "strength") {
+    const withI = rows.filter((r) => r.in_strength != null);
+    const withO = rows.filter((r) => r.out_strength != null);
+    const topI  = withI.length ? withI.reduce((a,b) => b.in_strength  > a.in_strength  ? b : a) : null;
+    const topO  = withO.length ? withO.reduce((a,b) => b.out_strength > a.out_strength ? b : a) : null;
+    el.innerHTML = `
+      <div class="kpi-card"><div class="kpi-value kpi-code">${topI?.icio_code||"—"}</div><div class="kpi-label">Highest in-strength — ${topI?.sector_name||""}</div></div>
+      <div class="kpi-card"><div class="kpi-value kpi-code">${topO?.icio_code||"—"}</div><div class="kpi-label">Highest out-strength — ${topO?.sector_name||""}</div></div>
+      <div class="kpi-card"><div class="kpi-value">${withI.length}</div><div class="kpi-label">Sectors with strength data</div></div>`;
+
   } else if (currentView === "table") {
     const top = rows[0];
     el.innerHTML = `
@@ -317,8 +330,8 @@ Chart.register({
     if (!scales.x || !scales.y) return;
     const mx = scales.x.getPixelForValue(0), my = scales.y.getPixelForValue(0);
     const {left, right, top, bottom} = chartArea;
-    [[mx,top,right-mx,my-top,"#1D9E7512"],[left,top,mx-left,my-top,"#D85A3012"],
-     [mx,my,right-mx,bottom-my,"#378ADD12"],[left,my,mx-left,bottom-my,"#BA751712"]]
+    [[mx,top,right-mx,my-top,"#0D5C4A14"],[left,top,mx-left,my-top,"#1A567A14"],
+     [mx,my,right-mx,bottom-my,"#5A9E5214"],[left,my,mx-left,bottom-my,"#A0784014"]]
       .forEach(([x,y,w,h,c]) => { ctx.save(); ctx.fillStyle=c; ctx.fillRect(x,y,w,h); ctx.restore(); });
     ctx.save();
     ctx.strokeStyle="rgba(80,80,80,0.22)"; ctx.lineWidth=1; ctx.setLineDash([5,4]);
@@ -351,55 +364,88 @@ Chart.register({
 
 // ── Render: bar charts ────────────────────────────────────────────────────
 
+function makeBarChart(canvasId, top10, lbl, color) {
+  destroyChart(canvasId);
+  charts[canvasId] = new Chart(document.getElementById(canvasId).getContext("2d"), {
+    type: "bar",
+    data: {
+      labels: top10.map((r) => r.icio_code),
+      datasets: [{
+        label: lbl,
+        data: top10.map((r) => +Number(r._val).toFixed(4)),
+        backgroundColor: `${color}55`, borderColor: color, borderWidth: 1.5, borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      animation: { duration: 500, easing: "easeOutQuart" },
+      plugins: {
+        legend: {display: false},
+        title: {
+          display: true, text: lbl,
+          font: {size:13, family:"DM Sans", weight:"500"},
+          color: "#0B1E1A", padding: {bottom:12}
+        },
+        tooltip: {
+          callbacks: {
+            title: (items) => `${top10[items[0].dataIndex]?.icio_code} — ${top10[items[0].dataIndex]?.sector_name||""}`,
+            label: (c) => ` ${lbl}: ${c.raw.toFixed(4)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          border: { display: true, color: "#6A8E87" },
+          grid: { color: "#D4E4E0", drawTicks: true },
+          ticks: { font: {size:11}, color: "#3A5A54" }
+        },
+        y: {
+          border: { display: true, color: "#6A8E87" },
+          grid: { display: false },
+          ticks: { font: {size:11, family:"monospace"}, color: "#3A5A54" }
+        }
+      }
+    }
+  });
+}
+
 function renderBars(year) {
   const rows = allData[year] || [];
   [
-    ["contribution","dig_contribution","Digital contribution","#185FA5"],
-    ["depth",       "dig_depth",       "Digital depth",       "#1D9E75"]
+    ["contribution","dig_contribution","Digital contribution","#0D5C4A"],
+    ["depth",       "dig_depth",       "Digital depth",       "#1A7A64"]
   ].forEach(([p, metric, baseLabel, color]) => {
-    destroyChart(`bar-${p}`);
     const c = col(metric);
     const lbl = colLabel(metric);
     const valid = rows.filter((r) => r[c] != null && !isNaN(r[c]));
-    // Sort descending: highest at top of horizontal bar chart
-    const top10 = [...valid].sort((a,b) => b[c]-a[c]).slice(0,10);
-
-    charts[`bar-${p}`] = new Chart(document.getElementById(`bar-${p}`).getContext("2d"), {
-      type: "bar",
-      data: {
-        labels: top10.map((r) => r.icio_code),
-        datasets: [{
-          label: lbl,
-          data: top10.map((r) => +Number(r[c]).toFixed(4)),
-          backgroundColor: `${color}44`, borderColor: color, borderWidth: 1.5, borderRadius: 4
-        }]
-      },
-      options: {
-        indexAxis: "y",
-        responsive: true,
-        plugins: {
-          legend: {display: false},
-          title: {
-            display: true, text: lbl,
-            font: {size:13, family:"DM Sans", weight:"500"},
-            color: "#0F1B2D", padding: {bottom:12}
-          },
-          tooltip: {
-            callbacks: {
-              title: (items) => sectorName(top10[items[0].dataIndex]?.icio_code),
-              label: (c) => `${lbl}: ${c.raw.toFixed(4)}`
-            }
-          }
-        },
-        scales: {
-          x: {grid:{color:"#EAE8E0"}, ticks:{font:{size:11}}},
-          y: {grid:{display:false}, ticks:{font:{size:11, family:"monospace"}}}
-        }
-      }
-    });
+    const top10 = [...valid].sort((a,b) => b[c]-a[c]).slice(0,10)
+      .map((r) => ({...r, _val: r[c]}));
+    makeBarChart(`bar-${p}`, top10, lbl, color);
   });
   document.getElementById("bar-sub").textContent =
-    `${scale==="norm"?"Normalised (0–1 within year)":"Unscaled raw"} values · ${year} · top 10 by each proxy`;
+    `${scale==="norm"?"z-score normalised":"Unscaled raw"} values · ${year} · top 10 by each proxy`;
+}
+
+// ── Render: network strength bar charts ───────────────────────────────────
+
+function renderStrength(year) {
+  const rows = allData[year] || [];
+  [
+    ["in-strength",  "in_strength",  "In-strength (supplier dependence)",  "#0D5C4A"],
+    ["out-strength", "out_strength", "Out-strength (supply provision)",     "#3D9E82"]
+  ].forEach(([id, metric, baseLabel, color]) => {
+    const normMetric = `${metric}_norm`;
+    const c = scale === "norm" ? normMetric : metric;
+    const lbl = `${baseLabel}${scale === "norm" ? " (z-score)" : " (raw)"}`;
+    const valid = rows.filter((r) => r[c] != null && !isNaN(r[c]));
+    const top10 = [...valid].sort((a,b) => b[c]-a[c]).slice(0,10)
+      .map((r) => ({...r, _val: r[c]}));
+    makeBarChart(`bar-${id}`, top10, lbl, color);
+  });
+  document.getElementById("strength-sub").textContent =
+    `${scale==="norm"?"z-score normalised":"Unscaled raw"} values · ${year} · top 10 by each strength measure`;
 }
 
 // ── Render: correlation charts ────────────────────────────────────────────
@@ -497,7 +543,7 @@ function renderQuadrant(year, p) {
   });
 
   document.getElementById("quad-sub").textContent =
-    `Fixed 0.5 threshold · ${year} · ${lbl} · hover for details`;
+    `Split at z = 0 (global mean) · ${year} · ${lbl} · hover for details`;
 }
 
 // ── Render: sector data table ─────────────────────────────────────────────
@@ -510,6 +556,9 @@ function renderTable(year) {
   const c_cont = col("dig_contribution");
   const c_dep  = col("dig_depth");
   const c_pr   = col("pagerank");
+
+  const c_ins = scale === "norm" ? "in_strength_norm"  : "in_strength";
+  const c_out = scale === "norm" ? "out_strength_norm" : "out_strength";
 
   tbody.innerHTML = rows.map((r,i) => {
     const qC = (r.pagerank_norm!=null && r.dig_contribution_norm!=null)
@@ -525,6 +574,10 @@ function renderTable(year) {
       <td class="tbl-name">${r.sector_name||""}</td>
       <td class="tbl-num">${fmt(r.pagerank, 6)}</td>
       <td class="tbl-num">${fmt(r.pagerank_norm)}</td>
+      <td class="tbl-num">${fmt(r[c_ins], 4)}</td>
+      <td class="tbl-num">${fmt(r.in_strength_norm, 3)}</td>
+      <td class="tbl-num">${fmt(r[c_out], 4)}</td>
+      <td class="tbl-num">${fmt(r.out_strength_norm, 3)}</td>
       <td class="tbl-num">${fmt(r[c_cont], 4)}</td>
       <td class="tbl-num">${fmt(r[c_dep],  4)}</td>
       <td class="tbl-quad">${dot(qC)}${qC||"—"}</td>
@@ -546,8 +599,9 @@ function renderTable(year) {
 
 const CTRL_VISIBILITY = {
   rankings:    {year:true,  proxy:false, scale:true },
-  correlation: {year:false, proxy:true,  scale:false},
   quadrant:    {year:true,  proxy:true,  scale:false},
+  correlation: {year:false, proxy:true,  scale:false},
+  strength:    {year:true,  proxy:false, scale:true },
   table:       {year:true,  proxy:false, scale:true }
 };
 
@@ -590,8 +644,9 @@ function setScale(s) {
 function renderAll() {
   renderKPIs(currentYear);
   if (currentView==="rankings")    renderBars(currentYear);
-  if (currentView==="correlation") renderCorrelations();
   if (currentView==="quadrant")    renderQuadrant(currentYear, proxy);
+  if (currentView==="correlation") renderCorrelations();
+  if (currentView==="strength")    renderStrength(currentYear);
   if (currentView==="table")       renderTable(currentYear);
 }
 
