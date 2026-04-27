@@ -95,6 +95,29 @@ for year in YEARS:
     print(f"fig_bars_{year}.png saved")
 
 
+# ── Figure: Average bar chart across all years ─────────────────────────────
+avg = panel.groupby("icio_code")[["dig_contribution", "dig_depth"]].mean().reset_index()
+
+AVG_BAR_PAIRS = [
+    ("dig_contribution", "Digital Capital Contribution"),
+    ("dig_depth", "Digital Capital Depth"),
+]
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+fig.suptitle("Top 10 Sectors by Average Digitalisation (2016–2021)", fontsize=13, fontweight="bold")
+
+for ax, (col, col_label) in zip(axes, AVG_BAR_PAIRS):
+    sub = avg.dropna(subset=[col]).nlargest(10, col).sort_values(col)
+    ax.barh(sub["icio_code"], sub[col], color="steelblue", edgecolor="white")
+    ax.set_xlabel(col_label)
+    ax.set_title(f"Top 10 — {col_label} (2016–2021 average)")
+
+fig.tight_layout()
+fig.savefig(OUT_FIG / "fig_bars_avg.png", dpi=300, bbox_inches="tight")
+plt.close(fig)
+print("fig_bars_avg.png saved")
+
+
 # ── Figure 3: Rank correlation over time ──────────────────────────────────
 def spearman_ci(x: pd.Series, y: pd.Series, alpha: float = 0.05):
     mask = x.notna() & y.notna()

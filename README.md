@@ -1,6 +1,6 @@
 # Digital Transition and Supply-Chain Structure in the Italian Economy
 
-Internet and Network Economics — Group Project 2025-2026
+Internet and Network Economics, Group Project 2025-2026
 
 ## Introduction
 Italy's economy is embedded in a global production network where sectors are interconnected through complex input-output relationships. Some sectors may be structurally central, acting as key suppliers to many downstream activities, while others remain more peripheral. At the same time, sectors differ considerably in their degree of digitalisation, in terms of ICT investment, digital capital intensity, or adoption of digital technologies. The central question of this project is whether these two dimensions, structural centrality and digitalisation, are systematically correlated. Answering this question matters because it speaks to a common assumption in the digital transition literature, namely that all sectors must digitalise to remain competitive and structurally important. The empirical analysis aims to assess whether this association holds for Italy, without making causal or normative claims about what any sector's position implies.
@@ -17,8 +17,8 @@ The analysis draws on two main datasets.
 | Dataset | Source | Content |
 |---|---|---|
 | OECD ICIO (2025 edition) | OECD | Inter-country input-output flows, 1995 to 2022, 85 countries and country groupings, 50 sectors |
-| EUKLEMS Statistical Module | EUKLEMS and INTANProd, LUISS University | Industry-level capital accounts including ICT and non-ICT capital services, 27 EU member states plus UK, US and Japan, 42 industries, 1995 to 2020 |
-| EUKLEMS Analytical Module | EUKLEMS and INTANProd, LUISS University | Industry-level investment and capital stocks for intangible assets beyond national accounts boundaries, including software, R&D, organisational capital and brand, same country and industry coverage |
+| EUKLEMS Statistical Module | [EUKLEMS and INTANProd, LUISS University](https://euklems-intanprod-llee.luiss.it/) | Industry-level capital accounts including ICT and non-ICT capital services, 27 EU member states plus UK, US and Japan, 42 industries, 1995 to 2020 |
+| EUKLEMS Analytical Module | [EUKLEMS and INTANProd, LUISS University](https://euklems-intanprod-llee.luiss.it/) | Industry-level investment and capital stocks for intangible assets beyond national accounts boundaries, including software, R&D, organisational capital and brand, same country and industry coverage |
 
 The first dataset is the OECD Inter-Country Input-Output tables, 2025 edition, which provide a globally balanced view of the inter-country and inter-industry flows of goods and services used as intermediate inputs and to meet final demand, covering 85 countries and country groupings across 50 sectors over the period 1995 to 2022. These tables are used to construct the production network and compute sector-level centrality measures for Italy.
 
@@ -33,15 +33,15 @@ Digitalisation is measured using two distinct proxies, each drawn from a differe
 
 - **Digital capital contribution** (`dig_contribution`): This proxy measures the contribution of software and database capital services to value added growth in a given year, as defined in the growth accounting framework (equation 14 of the EUKLEMS methodology). It is drawn from the statistical module, which follows standard national accounts definitions and is available for all countries and industries in the database. It is a **flow measure**: it captures how much software and database capital actually drives output in that year, weighted by its compensation share in value added. It is therefore sensitive to business-cycle conditions and year-to-year investment variation.
 
-$$\text{dig\_contribution}_s = VACon\_Soft\_DB_s$$
+$$\text{dig\_contribution}_{s} = VACon\_Soft\_DB_{s}$$
 
 - **Digital capital depth** (`dig_depth`): This proxy measures the stock of software and database capital accumulated by a sector relative to its current-price value added. It is drawn from the analytical module, which uses the perpetual inventory method with geometric depreciation to construct capital stocks for intangible assets not recorded under standard national accounts boundaries. It is a **stock measure**: it captures how structurally digitally intensive a sector is, independently of year-to-year fluctuations in investment, and is therefore better suited for cross-sector comparisons of digital depth.
 
-$$\text{dig\_depth}_s = \frac{K\_Soft\_DB_s}{VA\_CP_s}$$
+$$\text{dig\_depth}_s = \frac{K\_Soft\_DB_{s}}{VA\_CP_{s}}$$
 
-The two proxies are complementary by construction. `dig_contribution` is dynamic and growth-oriented; `dig_depth` is structural and level-oriented. A sector can score high on one and low on the other — for instance, a sector with a large accumulated stock of digital capital that is currently growing slowly, or one investing heavily in a year of rapid expansion despite a modest existing stock.
+The two proxies are complementary by construction. `dig_contribution` is dynamic and growth-oriented; `dig_depth` is structural and level-oriented. A sector can score high on one and low on the other: for instance, a sector with a large accumulated stock of digital capital that is currently growing slowly, or one investing heavily in a year of rapid expansion despite a modest existing stock.
 
-**Coverage note.** `dig_contribution` is available for all 58 Italian sectors in the growth accounts data. `dig_depth` is available for 49 of those 58 sectors; the remaining 9 — concentrated in distribution (G45, G46, G47), transport (H49–H53) and real estate (L68A) — lack a reliable capital stock estimate from the analytical module's perpetual inventory method. Both proxies are retained in the processed files with missing values where applicable. Sectors missing `dig_depth` are included in any analysis that uses `dig_contribution` alone, and are dropped only from analyses that require both metrics jointly.
+**Coverage note.** `dig_contribution` is available for all 58 Italian sectors in the growth accounts data. `dig_depth` is available for 49 of those 58 sectors; the remaining 9, concentrated in distribution (G45, G46, G47), transport (H49–H53) and real estate (L68A), lack a reliable capital stock estimate from the analytical module's perpetual inventory method. Both proxies are retained in the processed files with missing values where applicable. Sectors missing `dig_depth` are included in any analysis that uses `dig_contribution` alone, and are dropped only from analyses that require both metrics jointly.
 
 Both proxies are normalised using global z-score standardisation before any comparison or visualisation, so that differences in units and scale do not drive the results. See the [Normalisation](#normalisation) section below for details.
 
@@ -65,13 +65,9 @@ ICIO uses its own sector codes and is more granular for several production activ
 - `G`, `H49`, `H50`, `H51`, `H52`, `H53`, `I`, `J58T60`, `J61`, `J62_63`
 - `K`, `L`, `M`, `N`, `O`, `P`, `Q`, `R`, `S`, `T`
 
-Some are one-to-one matches with NACE, while others are aggregates or splits. For instance, ICIO `C16` corresponds to NACE `C16-C18`, while ICIO `C26` corresponds to NACE `C26`. ICIO also includes sectors such as `C301` and `C302T309`, both mapping to NACE `C29-C30`.
+Some are one-to-one matches with NACE, while others are aggregates or splits. For instance, ICIO `C16` corresponds to NACE `C16-C18`, while ICIO `C26` corresponds to NACE `C26`. ICIO also includes sectors such as `C301` and `C302T309`, both mapping to NACE `C29-C30`. Another issue is that in some cases more ICIO sectors, such as `A01`, `A02` and `A03`, correspond to a single NACE sector, in this case `A`. This is because the ICIO classification is designed to capture the full structure of global production networks, which requires a more detailed breakdown of certain sectors that play a key role in international trade and supply chains. The NACE classification, by contrast, is designed for national statistical purposes and therefore allows for more aggregation in some areas.
 
-Another issue is that in some cases more ICIO sectors, such as `A01`, `A02` and `A03`, correspond to a single NACE sector, in this case `A`. This is because the ICIO classification is designed to capture the full structure of global production networks, which requires a more detailed breakdown of certain sectors that play a key role in international trade and supply chains. The NACE classification, by contrast, is designed for national statistical purposes and therefore allows for more aggregation in some areas.
-
-Hence, a direct merge is not possible and a crosswalk is required.
-
-We use ICIO codes as the canonical identifier, since it is much easier to aggregate digitalisation from NACE to ICIO than to disaggregate ICIO sectors into NACE sub-sectors, and we want to preserve the full ICIO network structure.
+Hence, a direct merge is not possible and a crosswalk is required. We use ICIO codes as the canonical identifier, since it is much easier to aggregate digitalisation from NACE to ICIO than to disaggregate ICIO sectors into NACE sub-sectors, and we want to preserve the full ICIO network structure.
 
 In the current codebase, the crosswalk is implemented as a dictionary mapping **ICIO to NACE** in `Src/utils/constants.py` (`ICIO_TO_NACE`), for instance:
 
@@ -117,23 +113,12 @@ PageRank and betweenness are additionally normalised using global z-score standa
 
 ## Normalisation
 
-Before any comparison or visualisation, all continuous metrics — digitalisation proxies and centrality measures alike — are standardised using **global z-score normalisation**:
+Before any comparison or visualisation, all continuous metrics (digitalisation proxies and centrality measures alike) are standardised using **global z-score normalisation**:
 
 $$z_{s,t} = \frac{x_{s,t} - \bar{x}}{\sigma_x}$$
 
-where $\bar{x}$ and $\sigma_x$ are the mean and standard deviation computed over the full pooled sample (all sectors $s$ and all years $t$ jointly). This produces variables with mean zero and unit variance across the entire panel.
-
-### Why global z-scores rather than within-year min-max
-
-An earlier version of the analysis used within-year min-max scaling ($[0, 1]$) applied separately for each year. That approach had two drawbacks:
-
-- **Incomparability across years.** Min-max compresses each year's distribution into $[0, 1]$ independently, so a value of $0.8$ in 2016 and $0.8$ in 2021 carry no common meaning. A sector that became more digitalised over time could show a stable or even declining normalised value if other sectors digitalised faster.
-- **Sensitivity to outliers.** Min-max assigns values of exactly 0 and 1 to the annual minimum and maximum, so a single extreme observation can compress all other sectors toward the middle of the scale.
-
-Global z-scores resolve both issues: the scaling parameters are fixed across the panel, so all years and sectors are placed on the same reference frame, and the mean/standard deviation are much more robust to isolated outliers than the range.
-
-### What normalised values mean
-
+where $\bar{x}$ and $\sigma_x$ are the mean and standard deviation computed over the full pooled sample (all sectors $s$ and all years $t$ jointly). 
+This produces variables with mean zero and unit variance across the entire panel. The scaling parameters are fixed across the panel, so all years and sectors are placed on the same reference frame, and the mean/standard deviation are much more robust to isolated outliers than the range.
 - A sector with $z > 0$ is **above the global average** for that variable.
 - A sector with $z < 0$ is **below the global average**.
 - The natural quadrant split is $z = 0$: sectors above and below the global mean on both axes.
@@ -150,10 +135,7 @@ For each year, horizontal bar charts display the ten sectors with the highest ra
 
 ### Correlation Analysis
 
-The statistical relationship between supply-chain centrality and digitalisation is assessed using Spearman rank correlation. For each year and each digitalisation proxy, the Spearman coefficient between `pagerank_norm` and the normalised proxy is computed together with a 95% confidence interval derived from the Fisher $z$-transformation:
-
-$$z = \text{arctanh}(r), \quad \text{SE}(z) = \frac{1}{\sqrt{n-3}}, \quad \text{CI} = \left[\tanh(z - z_{0.025} \cdot \text{SE}),\ \tanh(z + z_{0.025} \cdot \text{SE})\right]$$
-
+The statistical relationship between supply-chain centrality and digitalisation is assessed using Spearman rank correlation. For each year and each digitalisation proxy, the Spearman coefficient between `pagerank_norm` and the normalised proxy is computed.
 Spearman rank correlation is used rather than Pearson because both the centrality and digitalisation distributions are right-skewed, and the research question concerns monotonic association rather than a linear one. Because Spearman operates on ranks, the choice of normalisation method does not affect the results; the normalised and raw series yield identical coefficients.
 
 ### Quadrant Classification
@@ -173,25 +155,41 @@ The threshold $z = 0$ corresponds to the pooled global mean across all six years
 
 This section reports the main outputs directly from the generated figures and tables.
 
+### Top-10 Digitalisation Rankings: Average (2016–2021)
+
+![Top-10 digitalisation sectors averaged over 2016–2021](outputs/figures/fig_bars_avg.png)
+
+The bar chart lists sectors by raw digitalisation scores. On contribution, the top of the ranking is intuitive as we can see publishing and IT services which are industries whose output heavily relies on software. The surprise is the transport manufacturing cluster sitting right behind them, a signal of how much embedded software now goes into building a modern vehicle or aircraft, an investment that pays off in measured output terms. Looking to the right at digital depth, the picture changes. IT and computer services still lead by a wide margin, but the most telling entry is telecommunications, which ranks second, well ahead of publishing and broadcasting and computer and electronic products. More structurally revealing is the appearance of the mining cluster across several positions in the lower half of the depth ranking, which are not typically associated with digitalisation at all.
+
+**Left panel: Digital capital contribution (`dig_contribution`):** Transport manufacturing (Motor vehicles `C29`, Shipbuilding `C301`, Other transport equipment `C302T309`) holds positions three to five but with values closer to the median of the top ten, suggesting the exceptionally high single-year readings in 2021 were partly driven by post-pandemic investment surges that average out. Electricity and gas (`D`), Finance and insurance (`K`), Utilities (`E`), Arts and recreation (`R`), and Electrical equipment (`C26`) round out the top ten.
+
+**Right panel: Digital capital depth (`dig_depth`):** `C26` (Electrical equipment) and `D` (Electricity and gas supply) also rank in the top five, reflecting large accumulated ICT stocks in equipment manufacturing and modern energy infrastructure. The mining cluster (`B09`, `B08`, `B05`, `B07`, `B06`) is present but clearly separated from the digital service leaders, indicating that while their depth ratios are elevated, they do not dominate the multi-year average.
+
+### Centrality-Digitalisation Quadrants: 2019
+
+![Centrality-digitalisation quadrants in 2019](outputs/figures/fig_quadrants_2019.png)
+
+2019 is the most recent and reliable reference year for our analysis: 2020 is the pandemic year and 2021 presents significant data gaps. The distribution is very balanced and what we can infer from it is the absence of any systematic relationship between centrality and digitalisation. The sectors that sit at the heart of the supply chain are there because what they supply is physically irreplaceable, not because they are technologically advanced — software intensity does not imply indispensability.
+
+**Left panel: Digital capital contribution:** The highest-centrality sectors, Public administration (`O`), Education (`P`), Wholesale trade (`Q`), and Administrative services (`N`), are split across the HH and HL quadrants with no clear pattern. Several sectors with above-average contribution (transport manufacturing `C29`, `C302T309`, `C19`) are well below the global centrality mean, sitting in LH. The HH quadrant is sparsely populated; `C16` (Wood and paper), `C301` (Shipbuilding) and `N` (Administrative services) are the most visible occupants, but they do not share an obvious common characteristic. `J58T60` (Publishing) sits in HL despite being an intrinsically digital sector, as its annual contribution flow was below average in 2019 even though its stock is large.
+
+**Right panel: Digital capital depth:** The depth panel reveals a clearer structural divergence. `J62_63` (IT services) stands far to the right as the highest-depth sector while remaining above-average in centrality, placing it firmly in HH. `J61` (Telecommunications) also occupies HH, confirming that the two core digital service sectors are both structurally central and digitally deep. By contrast, the mining cluster (`B05`–`B09`) lies in the LH quadrant, deep in digital capital relative to value added but peripheral in the supply network. The most central sectors (`C16`, `C301`, `O`, `Q`) cluster near zero on the depth axis, confirming that structural centrality does not require a large accumulated digital stock.
+
 ### Spearman Correlation Over Time
 
 ![Spearman correlation over time](outputs/figures/fig_correlation.png)
 
-The panel tracks, for each year from 2016 to 2021, the Spearman rank correlation between normalised PageRank (supply-chain centrality) and each of the two digitalisation proxies. The contribution correlation oscillates around zero, with a slight positive value in 2016 that fades and turns modestly negative through 2021. The depth correlation follows a more pronounced downward trajectory, reaching $\rho \approx -0.27$ in 2021. Neither proxy shows a sustained positive association between centrality and digitalisation over the sample period.
+The correlation panel confirms this from a mathematical point of view. Across all six years from 2016 to 2021, the Spearman rank correlation between normalised PageRank and both digitalisation proxies hovers near zero, with out-degree showing an inconsistent exception in some years. The contribution correlation oscillates around zero, with a slight positive value in 2016 that fades and turns modestly negative through 2021. The depth correlation follows a more pronounced downward trajectory, reaching $\rho \approx -0.27$ in 2021. Neither proxy shows a sustained positive association between centrality and digitalisation over the sample period.
 
-### Top-10 Digitalisation Rankings — 2021
+### COVID-19 Effect: 2020 Quadrants
 
-![Top-10 digitalisation sectors in 2021](outputs/figures/fig_bars_2021.png)
+![Centrality-digitalisation quadrants in 2020](outputs/figures/fig_quadrants_2020.png)
 
-**Left panel — Digital capital contribution (`dig_contribution`):** This proxy captures how much software and database capital services contributed to value-added growth in that year. The top three sectors in 2021 are Motor vehicles (`C29`), Building and repairing of ships (`C301`), and Other transport equipment (`C302T309`), all recording the same peak value. This is somewhat surprising: transport manufacturing is not conventionally considered a software-intensive industry. The high contribution likely reflects exceptional ICT investment flows in a post-pandemic recovery year rather than a structural feature of these sectors. IT services and data activities (`J62_63`) and Publishing, audiovisual and broadcasting (`J58T60`) also appear in the top 5 — a more expected result, given that these are intrinsically digital sectors.
+The 2020 year is worth an in-depth analysis since data shows that the pandemic dragged down digital contribution across most sectors. This requires careful interpretation, as it seems counterintuitive since we may think that lockdowns should have raised the measured contribution of software capital, as remote work and digital activity expanded. The explanation relies on the fact that our metric measures contribution to value added, which in general decreased during the pandemic. On the other hand, software capital stocks, being accumulated over years, did not fall with it. The result is that the denominator shrank while the numerator held, and we can indeed see that the cloud slightly shifts to the left in 2020 compared to 2019.
 
-**Right panel — Digital capital depth (`dig_depth`):** This proxy measures accumulated software and database capital relative to value added. The top positions are entirely dominated by mining and extraction sectors: Coal mining (`B05`), Oil and gas extraction (`B06`), Other mining (`B08`), Mining support services (`B09`), and Metal ore mining (`B07`) all share the highest depth value. This is a surprising finding. Mining sectors are not typically associated with high digital intensity, but their elevated depth ratio likely reflects a combination of a large accumulated ICT stock (e.g. for geological sensing, remote monitoring and process control) and a relatively modest value-added denominator, inflating the ratio. Electricity and gas supply (`D`) ranks sixth, which is more expected given the digital infrastructure requirements of modern energy networks.
+**Left panel: Digital capital contribution:** Only `J61` (Telecommunications) and `R` (Arts and recreation) record clearly positive contribution in 2020, reflecting the surge in communication and remote-delivery demand during lockdowns. The LL quadrant dominates, with high-centrality sectors like `O` (Public administration) and `E` (Utilities) in HL only because most of their peers dropped further.
 
-### Centrality-Digitalisation Quadrants — 2021
-
-![Centrality-digitalisation quadrants in 2021](outputs/figures/fig_quadrants_2021.png)
-
-The scatter plots confirm visually that no strong positive diagonal pattern emerges. In the contribution panel, the highest-centrality sectors (Public administration `O`, Professional services `M`, IT services `J62_63`) are scattered across quadrants, and several of the most digitalised sectors by contribution (transport manufacturing) sit below the global centrality mean. In the depth panel, the mining sectors with the highest depth are all below-average in centrality, placing them in the LH quadrant.
+**Right panel: Digital capital depth:** `J62_63` (IT services) registers an extreme negative depth normalisation in 2020, falling to the far left of the distribution: its value added surged while the capital stock grew more slowly, mechanically compressing the ratio. `J61` (Telecommunications) remains firmly in HH, with both high centrality and a depth ratio that held up through the pandemic. The mining cluster shifts further into LH as their depth ratios remain structurally elevated while their centrality is unchanged.
 
 ### Results Tables (2016–2021)
 
@@ -225,19 +223,14 @@ Measures the stock of software and database capital accumulated by a sector rela
 | 2020 | 44 | −0.122 | 6 | 13 | 11 | 14 |
 | 2021 | 22 | −0.269 | 4 | 9 | 6 | 3 |
 
-The depth correlation is consistently negative and worsens over time, reaching $\rho = -0.269$ in 2021. This means sectors with a larger accumulated stock of digital capital tend to be *less* central in the supply chain — the opposite of what the network propagation hypothesis would predict. HL dominates across all years, indicating that the most structurally central sectors (e.g. wholesale trade, manufacturing hubs) maintain their network position without accumulating proportionally large digital capital stocks.
+The depth correlation is consistently negative and worsens over time, reaching $\rho = -0.269$ in 2021. This means sectors with a larger accumulated stock of digital capital tend to be *less* central in the supply chain, the opposite of what the network propagation hypothesis would predict. HL dominates across all years, indicating that the most structurally central sectors (e.g. wholesale trade, manufacturing hubs) maintain their network position without accumulating proportionally large digital capital stocks.
 
-### Conclusions
+## Limitations
 
-Given the number of metrics involved — two digitalisation proxies, four centrality measures, 49 sectors and six years — we built an interactive dashboard to allow flexible navigation across all dimensions of the analysis.
+The analysis is restricted to Italy, so the findings reflect a specific production network structure and cannot be generalised to other countries without replication. The EUKLEMS analytical module loses coverage for 27 of the 49 sectors in 2021, reducing the depth analysis for that year to a partial sample that should be read with caution. The NACE-to-ICIO crosswalk forces several many-to-one mappings, meaning that a single digitalisation value is assigned to multiple ICIO sectors that may differ internally, compressing genuine within-aggregate variation.
 
-The bar chart lists sectors by raw digitalisation scores. For digital capital **contribution**, the ranking is broadly intuitive: Publishing and broadcasting (`J58T60`) and IT services (`J62_63`) appear consistently near the top, reflecting their intrinsically software-intensive production processes. The presence of transport manufacturing (`C29`, `C301`, `C302T309`) at the very top in some years is a surprise — it likely reflects exceptional ICT investment surges in post-pandemic recovery years rather than a structural feature of these sectors. For digital capital **depth**, the ranking is dominated by IT services (`J62_63`) and Telecommunications (`J61`), as expected. The appearance of the mining cluster (`B05`–`B09`) near the top is less intuitive but can be explained by the ratio construction: these sectors hold large accumulated ICT stocks (geological sensing, remote monitoring) relative to a modest value-added denominator, mechanically inflating the depth ratio.
-
-The quadrant map for 2019 — a representative pre-pandemic reference year — confirms the absence of a systematic relationship between supply-chain centrality and digitalisation. Sectors are broadly scattered across all four quadrants with no dominant diagonal pattern. The most central sectors (wholesale trade `G`, professional services `M`, public administration `O`) fall in the HL quadrant — they are structurally pivotal but digitally average — while the most digitalised sectors by depth (mining) cluster in LH. The HH quadrant, where both dimensions are above average, is sparsely populated and does not concentrate in any recognisable industry group.
-
-The correlation panel confirms this picture across all years and all four centrality measures. Rank correlations between centraliy and both digitalisation proxies hover near zero throughout 2016–2021 for PageRank, Betweenness, In-strength and Out-strength alike. No centrality measure produces a sustained positive or negative association with either proxy, which rules out the possibility that the result is an artefact of the specific centrality chosen.
-
-The 2020 pandemic year deserves a brief note. Digital capital **contribution** fell sharply in 2020 despite the widespread acceleration of digital activity. This is not paradoxical: the contribution measure captures the marginal growth contribution of ICT capital services in that year, and if value added collapsed faster than ICT capital services could be deployed, the contribution ratio mechanically declines. The depth measure, being a stock-to-flow ratio, is less sensitive to this annual shock and shows a more stable trajectory.
+## Dashboard
+Given the number of metrics involved, two digitalisation proxies, four centrality measures, 49 sectors and six years, we built an interactive dashboard to allow flexible navigation across all dimensions of the analysis. The dashboard is implemented in vanilla HTML, CSS and JavaScript and is live at **https://mtorella.github.io/Internet-and-Network-Economics/**
 
 ## Repository Structure and Execution
 
@@ -260,7 +253,3 @@ Suggested execution order:
 Alternative:
 
 1. `python Src/5_Full_Pipeline.py`
-
-The dashboard is live at **https://mtorella.github.io/Internet-and-Network-Economics/**
-
-To run locally, serve via `python -m http.server 8000` and open `http://localhost:8000/docs/index.html`.
