@@ -33,11 +33,11 @@ Digitalisation is measured using two distinct proxies, each drawn from a differe
 
 - **Digital capital contribution** (`dig_contribution`): This proxy measures the contribution of software and database capital services to value added growth in a given year, as defined in the growth accounting framework (equation 14 of the EUKLEMS methodology). It is drawn from the statistical module, which follows standard national accounts definitions and is available for all countries and industries in the database. It is a **flow measure**: it captures how much software and database capital actually drives output in that year, weighted by its compensation share in value added. It is therefore sensitive to business-cycle conditions and year-to-year investment variation.
 
-$$\text{dig\_contribution}_{s} = VACon\_Soft\_DB_{s}$$
+$$\text{DigContribution}_{s} = \text{VAConSoftDB}_{s}$$
 
 - **Digital capital depth** (`dig_depth`): This proxy measures the stock of software and database capital accumulated by a sector relative to its current-price value added. It is drawn from the analytical module, which uses the perpetual inventory method with geometric depreciation to construct capital stocks for intangible assets not recorded under standard national accounts boundaries. It is a **stock measure**: it captures how structurally digitally intensive a sector is, independently of year-to-year fluctuations in investment, and is therefore better suited for cross-sector comparisons of digital depth.
 
-$$\text{dig\_depth}_s = \frac{K\_Soft\_DB_{s}}{VA\_CP_{s}}$$
+$$\text{DigDepth}_s = \frac{KSoftDB_{s}}{VACP_{s}}$$
 
 The two proxies are complementary by construction. `dig_contribution` is dynamic and growth-oriented; `dig_depth` is structural and level-oriented. A sector can score high on one and low on the other: for instance, a sector with a large accumulated stock of digital capital that is currently growing slowly, or one investing heavily in a year of rapid expansion despite a modest existing stock.
 
