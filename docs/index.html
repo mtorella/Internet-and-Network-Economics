@@ -27,7 +27,6 @@
   <button class="active" onclick="switchView('rankings',this)">Digitalisation rankings</button>
   <button onclick="switchView('quadrant',this)">Quadrant classification</button>
   <button onclick="switchView('correlation',this)">Spearman correlation</button>
-  <button onclick="switchView('strength',this)">Network strength</button>
   <button onclick="switchView('table',this)">Sector data</button>
 </nav>
 
@@ -36,7 +35,8 @@
     <label>Year</label>
     <select id="year-sel" onchange="onYearChange()">
       <option>2016</option><option>2017</option><option>2018</option>
-      <option>2019</option><option>2020</option><option selected>2021</option>
+      <option>2019</option><option>2020</option><option>2021</option>
+      <option id="opt-avg" value="avg" selected>2016–2021 avg</option>
     </select>
   </div>
 
@@ -45,6 +45,16 @@
     <div class="pill-group">
       <div class="pill active" id="pill-contribution" onclick="setProxy('contribution')">Digital contribution</div>
       <div class="pill"        id="pill-depth"        onclick="setProxy('depth')">Digital depth</div>
+    </div>
+  </div>
+
+  <div id="ctrl-centrality" class="ctrl-group">
+    <label>Centrality</label>
+    <div class="pill-group">
+      <div class="pill active" id="pill-pagerank"    onclick="setCentrality('pagerank')">PageRank</div>
+      <div class="pill"        id="pill-betweenness" onclick="setCentrality('betweenness')">Betweenness</div>
+      <div class="pill"        id="pill-in_strength" onclick="setCentrality('in_strength')">In-strength</div>
+      <div class="pill"        id="pill-out_strength" onclick="setCentrality('out_strength')">Out-strength</div>
     </div>
   </div>
 
@@ -70,8 +80,8 @@
       <div class="card-title">Top 10 sectors by digitalisation</div>
       <div class="card-sub" id="bar-sub">Top 10 by each proxy, highest at top</div>
       <div class="chart-row">
-        <div class="chart-wrap"><canvas id="bar-contribution" height="360"></canvas></div>
-        <div class="chart-wrap"><canvas id="bar-depth" height="360"></canvas></div>
+        <div class="chart-wrap"><canvas id="bar-contribution"></canvas></div>
+        <div class="chart-wrap"><canvas id="bar-depth"></canvas></div>
       </div>
     </div>
   </div>
@@ -81,19 +91,12 @@
     <div class="card">
       <div class="card-title">Spearman rank correlation over time</div>
       <div class="card-sub">
-        PageRank vs each digitalisation proxy · 2016&ndash;2021 · 95% CI (Fisher <i>z</i>-transform) ·
-        Active proxy highlighted · Spearman is rank-based: raw and normalised inputs give identical <i>r</i>
-      </div>
-      <div class="info-banner">
-        <strong>Statistical note.</strong>
-        With n&nbsp;&asymp;&nbsp;44&ndash;49 the critical value at &alpha;&nbsp;=&nbsp;0.05 (two-tailed) is
-        |<i>r</i>|&nbsp;&asymp;&nbsp;0.30. Hover a data point to see whether that year&rsquo;s estimate
-        exceeds the threshold. Because all observed correlations are close to zero and the 95% CI includes
-        zero in every year, none of the associations are statistically significant.
+        Spearman ρ between each centrality measure and each digitalisation proxy &middot; 2016&ndash;2021 &middot;
+        Hover a point for significance · |<i>r</i>|&nbsp;&ge;&nbsp;0.30 marked ✓
       </div>
       <div class="chart-row">
-        <div class="chart-wrap"><canvas id="corr-contribution" height="300"></canvas></div>
-        <div class="chart-wrap"><canvas id="corr-depth" height="300"></canvas></div>
+        <div class="chart-wrap"><canvas id="corr-contribution"></canvas></div>
+        <div class="chart-wrap"><canvas id="corr-depth"></canvas></div>
       </div>
     </div>
   </div>
@@ -103,40 +106,21 @@
     <div class="card">
       <div class="card-title">Centrality&ndash;digitalisation quadrant map</div>
       <div class="card-sub" id="quad-sub">Fixed threshold at 0.5 · within-year normalisation · hover for details</div>
-      <div class="info-banner">
-        <strong>Standardisation note.</strong>
-        Both axes are <em>global z-scores</em> computed over the full 2016&ndash;2021 panel
-        (294&nbsp;sector-year observations): <i>z&nbsp;=&nbsp;(x&nbsp;&minus;&nbsp;&mu;)&nbsp;/&nbsp;&sigma;</i>.
-        The split threshold is <strong>z&nbsp;=&nbsp;0</strong> (the global mean), so &ldquo;High&rdquo; means
-        above-average across all years, not just within the current year. Quadrant membership is directly
-        comparable across years. Typical range is roughly &minus;3 to +3; large positive z-scores indicate
-        outliers. Use the Sector&nbsp;data tab to inspect raw values.
-      </div>
-      <div class="quad-wrap"><canvas id="quad-chart"></canvas></div>
-      <div class="q-legend">
-        <div class="q-legend-item"><div class="q-dot" style="background:var(--hh)"></div>HH &mdash; High centrality / High digital</div>
-        <div class="q-legend-item"><div class="q-dot" style="background:var(--hl)"></div>HL &mdash; High centrality / Low digital</div>
-        <div class="q-legend-item"><div class="q-dot" style="background:var(--lh)"></div>LH &mdash; Low centrality / High digital</div>
-        <div class="q-legend-item"><div class="q-dot" style="background:var(--ll)"></div>LL &mdash; Low centrality / Low digital</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Network strength -->
-  <div class="view" id="view-strength">
-    <div class="card">
-      <div class="card-title">Network strength — in-degree &amp; out-degree</div>
-      <div class="card-sub" id="strength-sub">Top 10 sectors by in-strength and out-strength · weighted sum of incoming/outgoing Leontief coefficients</div>
-      <div class="info-banner">
-        <strong>What are in-strength and out-strength?</strong>
-        In-strength measures how intensively a sector draws on other sectors as suppliers (sum of incoming edge weights).
-        Out-strength measures how intensively it supplies inputs to others (sum of outgoing edge weights).
-        Both are computed on the thresholded Leontief coefficient matrix (<i>a<sub>ij</sub> &ge; 0.01</i>).
-        Toggle between raw and z-score values using the Scale control.
-      </div>
-      <div class="chart-row">
-        <div class="chart-wrap"><canvas id="bar-in-strength" height="360"></canvas></div>
-        <div class="chart-wrap"><canvas id="bar-out-strength" height="360"></canvas></div>
+      <div class="quad-body">
+        <div class="q-legend q-legend-top">
+          <div class="q-legend-item"><div class="q-dot" style="background:var(--hh)"></div>HH &mdash; High centrality / High digital</div>
+          <div class="q-legend-item"><div class="q-dot" style="background:var(--hl)"></div>HL &mdash; High centrality / Low digital</div>
+          <div class="q-legend-item"><div class="q-dot" style="background:var(--lh)"></div>LH &mdash; Low centrality / High digital</div>
+          <div class="q-legend-item"><div class="q-dot" style="background:var(--ll)"></div>LL &mdash; Low centrality / Low digital</div>
+        </div>
+        <div class="quad-wrap"><canvas id="quad-chart"></canvas></div>
+        <div class="info-banner quad-note">
+          <strong>Standardisation note.</strong>
+          Both axes are <em>global z-scores</em> computed over the full 2016&ndash;2021 panel
+          (294&nbsp;sector-year observations): <i>z&nbsp;=&nbsp;(x&nbsp;&minus;&nbsp;&mu;)&nbsp;/&nbsp;&sigma;</i>.
+          The split threshold is <strong>z&nbsp;=&nbsp;0</strong> (the global mean), so &ldquo;High&rdquo; means
+          above-average across all years, not just within the current year.
+        </div>
       </div>
     </div>
   </div>

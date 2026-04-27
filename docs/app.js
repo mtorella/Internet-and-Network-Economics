@@ -49,13 +49,20 @@ const YEARS = [2016,2017,2018,2019,2020,2021];
 const DATA_ROOT_CANDIDATES = ["../data/processed","data/processed","/data/processed"];
 
 let proxy       = "contribution"; // "contribution" | "depth"
+let centrality  = "pagerank";     // "pagerank" | "betweenness" | "in_strength" | "out_strength"
 let scale       = "raw";          // "raw" | "norm"
-let currentYear = 2021;
+let currentYear = "avg";
 let allData     = {};
-let corrData    = {};
 let charts      = {};
 let dataReady   = false;
 let currentView = "rankings";
+
+const CENTRALITY_LABELS = {
+  pagerank:     "PageRank",
+  betweenness:  "Betweenness",
+  in_strength:  "In-strength",
+  out_strength: "Out-strength",
+};
 
 function sectorName(icio) { return SECTOR_NAMES[icio] || icio; }
 
@@ -137,17 +144,20 @@ function spearman(xs, ys) {
   return {r, lo:Math.tanh(zr-1.96*se), hi:Math.tanh(zr+1.96*se), n};
 }
 
-function computeCorrelations() {
-  // Spearman is rank-based: invariant to monotone transforms such as
-  // min-max normalization. Raw and normalised inputs yield identical r.
-  corrData = {contribution:[], depth:[]};
-  YEARS.forEach((y) => {
-    const rows = allData[y] || [];
-    corrData.contribution.push({year:y,
-      ...spearman(rows.map((r)=>r.pagerank), rows.map((r)=>r.dig_contribution))});
-    corrData.depth.push({year:y,
-      ...spearman(rows.map((r)=>r.pagerank), rows.map((r)=>r.dig_depth))});
-  });
+// Spearman is rank-based: invariant to monotone transforms. Raw and
+// normalised inputs yield identical r. We compute on demand so that the
+// centrality selector can change which column is used as the x-axis.
+function buildCorrData(centCol) {
+  return {
+    contribution: YEARS.map((y) => {
+      const rows = allData[y] || [];
+      return {year:y, ...spearman(rows.map((r)=>r[centCol]), rows.map((r)=>r.dig_contribution))};
+    }),
+    depth: YEARS.map((y) => {
+      const rows = allData[y] || [];
+      return {year:y, ...spearman(rows.map((r)=>r[centCol]), rows.map((r)=>r.dig_depth))};
+    }),
+  };
 }
 
 // Threshold is 0 because _norm columns are z-scores: 0 = global mean.
@@ -190,13 +200,13 @@ async function loadAll() {
       );
       const sample = allData[2021] || [];
       if (!sample.length) throw new Error("Bundled data is empty.");
-      computeCorrelations();
       dataReady = true;
       const withDig = sample.filter((r) => r.dig_contribution_norm != null).length;
       document.getElementById("status").style.display = "none";
       document.getElementById("load-msg").textContent =
         `${sample.length} sectors · ${withDig} with digitalisation data`;
       showView("rankings");
+      document.getElementById("year-sel").value = "avg";
       renderAll();
       return;
     }
@@ -217,7 +227,6 @@ async function loadAll() {
       `${[...new Set(sample.slice(0,6).map((r)=>r.icio_code))].join(", ")}`
     );
 
-    computeCorrelations();
     dataReady = true;
     document.getElementById("status").style.display = "none";
     document.getElementById("load-msg").textContent =
@@ -244,54 +253,32 @@ function renderKPIs(year) {
   const rows = allData[year] || [];
 
   if (currentView === "rankings") {
-    const withC = rows.filter((r) => r.dig_contribution != null);
-    const withD = rows.filter((r) => r.dig_depth != null);
+    const kpiRows = year === "avg" ? avgRows() : rows;
+    const withC = kpiRows.filter((r) => r.dig_contribution != null);
+    const withD = kpiRows.filter((r) => r.dig_depth != null);
     const topC  = withC.length ? withC.reduce((a,b) => b.dig_contribution > a.dig_contribution ? b : a) : null;
     const topD  = withD.length ? withD.reduce((a,b) => b.dig_depth > a.dig_depth ? b : a) : null;
     el.innerHTML = `
-      <div class="kpi-card"><div class="kpi-value">${rows.length}</div><div class="kpi-label">Sectors in panel</div></div>
+      <div class="kpi-card"><div class="kpi-value">${kpiRows.length}</div><div class="kpi-label">Sectors in panel</div></div>
       <div class="kpi-card"><div class="kpi-value">${withC.length}</div><div class="kpi-label">With contribution data</div></div>
       <div class="kpi-card"><div class="kpi-value">${withD.length}</div><div class="kpi-label">With depth data</div></div>
       <div class="kpi-card"><div class="kpi-value kpi-code">${topC?.icio_code||"—"}</div><div class="kpi-label">Top contribution — ${topC?.sector_name||""}</div></div>
       <div class="kpi-card"><div class="kpi-value kpi-code">${topD?.icio_code||"—"}</div><div class="kpi-label">Top depth — ${topD?.sector_name||""}</div></div>`;
 
   } else if (currentView === "correlation") {
-    const cy = corrData.contribution.find((d)=>d.year===year) || {};
-    const dy = corrData.depth.find((d)=>d.year===year) || {};
-    const arrow = (r) => isNaN(r) ? "" : r>0.05 ? " ↑" : r<-0.05 ? " ↓" : " →";
-    // Critical |r| ≈ 0.30 for n=44 at α=0.05 (two-tailed, Fisher z-test)
-    const sig = (r,n) => {
-      if (isNaN(r)||n==null) return "";
-      const crit = 0.3; // approximate for n≈44
-      return Math.abs(r) >= crit ? " ✓" : " (n.s.)";
-    };
-    el.innerHTML = `
-      <div class="kpi-card"><div class="kpi-value">${fmt(cy.r)}${arrow(cy.r)}${sig(cy.r,cy.n)}</div><div class="kpi-label">r — contribution vs PageRank (${year})</div></div>
-      <div class="kpi-card"><div class="kpi-value">${fmt(dy.r)}${arrow(dy.r)}${sig(dy.r,dy.n)}</div><div class="kpi-label">r — depth vs PageRank (${year})</div></div>
-      <div class="kpi-card"><div class="kpi-value">[${fmt(cy.lo)}, ${fmt(cy.hi)}]</div><div class="kpi-label">95% CI — contribution</div></div>
-      <div class="kpi-card"><div class="kpi-value">[${fmt(dy.lo)}, ${fmt(dy.hi)}]</div><div class="kpi-label">95% CI — depth</div></div>
-      <div class="kpi-card"><div class="kpi-value">${cy.n??""} / ${dy.n??""}</div><div class="kpi-label">n (contribution / depth)</div></div>`;
+    el.innerHTML = "";
 
   } else if (currentView === "quadrant") {
     const qc = proxy==="contribution" ? "dig_contribution_norm" : "dig_depth_norm";
-    const valid = rows.filter((r) => r.pagerank_norm!=null && r[qc]!=null);
+    const centCol = `${centrality}_norm`;
+    const valid = rows.filter((r) => r[centCol]!=null && r[qc]!=null);
     const counts = {HH:0, HL:0, LH:0, LL:0};
-    valid.forEach((r) => { counts[assignQ(r.pagerank_norm, r[qc])]++; });
+    valid.forEach((r) => { counts[assignQ(r[centCol], r[qc])]++; });
     el.innerHTML = Object.entries(counts).map(([q,n]) => `
       <div class="kpi-card kpi-quad kpi-${q.toLowerCase()}">
         <div class="kpi-value">${n}</div>
         <div class="kpi-label">${Q_LABEL[q]}</div>
       </div>`).join("");
-
-  } else if (currentView === "strength") {
-    const withI = rows.filter((r) => r.in_strength != null);
-    const withO = rows.filter((r) => r.out_strength != null);
-    const topI  = withI.length ? withI.reduce((a,b) => b.in_strength  > a.in_strength  ? b : a) : null;
-    const topO  = withO.length ? withO.reduce((a,b) => b.out_strength > a.out_strength ? b : a) : null;
-    el.innerHTML = `
-      <div class="kpi-card"><div class="kpi-value kpi-code">${topI?.icio_code||"—"}</div><div class="kpi-label">Highest in-strength — ${topI?.sector_name||""}</div></div>
-      <div class="kpi-card"><div class="kpi-value kpi-code">${topO?.icio_code||"—"}</div><div class="kpi-label">Highest out-strength — ${topO?.sector_name||""}</div></div>
-      <div class="kpi-card"><div class="kpi-value">${withI.length}</div><div class="kpi-label">Sectors with strength data</div></div>`;
 
   } else if (currentView === "table") {
     const top = rows[0];
@@ -366,19 +353,24 @@ Chart.register({
 
 function makeBarChart(canvasId, top10, lbl, color) {
   destroyChart(canvasId);
-  charts[canvasId] = new Chart(document.getElementById(canvasId).getContext("2d"), {
+  const canvas = document.getElementById(canvasId);
+  canvas.style.height = "380px";  // pin height before Chart.js takes over
+  charts[canvasId] = new Chart(canvas.getContext("2d"), {
     type: "bar",
     data: {
       labels: top10.map((r) => r.icio_code),
       datasets: [{
         label: lbl,
         data: top10.map((r) => +Number(r._val).toFixed(4)),
-        backgroundColor: `${color}55`, borderColor: color, borderWidth: 1.5, borderRadius: 4
+        backgroundColor: `${color}66`, borderColor: color, borderWidth: 1.5, borderRadius: 3,
+        borderSkipped: false
       }]
     },
     options: {
       indexAxis: "y",
       responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { right: 8 } },
       animation: { duration: 500, easing: "easeOutQuart" },
       plugins: {
         legend: {display: false},
@@ -397,105 +389,125 @@ function makeBarChart(canvasId, top10, lbl, color) {
       scales: {
         x: {
           beginAtZero: true,
-          border: { display: true, color: "#6A8E87" },
-          grid: { color: "#D4E4E0", drawTicks: true },
-          ticks: { font: {size:11}, color: "#3A5A54" }
+          border: { display: true, color: "#2A5A52", width: 2 },
+          grid: { color: "#C0D8D4", lineWidth: 1, drawTicks: true },
+          ticks: { font: {size:11}, color: "#2A4A44", maxTicksLimit: 6 }
         },
         y: {
-          border: { display: true, color: "#6A8E87" },
+          border: { display: true, color: "#2A5A52", width: 2 },
           grid: { display: false },
-          ticks: { font: {size:11, family:"monospace"}, color: "#3A5A54" }
+          ticks: { font: {size:11, family:"monospace"}, color: "#2A4A44", padding: 4 }
         }
       }
     }
   });
 }
 
+function avgRows() {
+  // Average each metric across all years per sector, using raw values.
+  const bySector = {};
+  YEARS.forEach((y) => {
+    (allData[y] || []).forEach((r) => {
+      if (!bySector[r.icio_code]) bySector[r.icio_code] = {icio_code: r.icio_code, sector_name: r.sector_name, _counts: {}, _sums: {}};
+      const s = bySector[r.icio_code];
+      ["dig_contribution","dig_contribution_norm","dig_depth","dig_depth_norm"].forEach((m) => {
+        if (r[m] != null && !isNaN(r[m])) {
+          s._sums[m] = (s._sums[m] || 0) + r[m];
+          s._counts[m] = (s._counts[m] || 0) + 1;
+        }
+      });
+    });
+  });
+  return Object.values(bySector).map((s) => {
+    const out = {icio_code: s.icio_code, sector_name: s.sector_name};
+    Object.keys(s._sums).forEach((m) => { out[m] = s._sums[m] / s._counts[m]; });
+    return out;
+  });
+}
+
 function renderBars(year) {
-  const rows = allData[year] || [];
+  const isAvg = year === "avg";
+  const rows = isAvg ? avgRows() : (allData[year] || []);
+  const yearLbl = isAvg ? "2016–2021 avg" : String(year);
+
   [
     ["contribution","dig_contribution","Digital contribution","#0D5C4A"],
     ["depth",       "dig_depth",       "Digital depth",       "#1A7A64"]
   ].forEach(([p, metric, baseLabel, color]) => {
     const c = col(metric);
-    const lbl = colLabel(metric);
+    const lbl = `${colLabel(metric)}${isAvg ? " — avg" : ""}`;
     const valid = rows.filter((r) => r[c] != null && !isNaN(r[c]));
     const top10 = [...valid].sort((a,b) => b[c]-a[c]).slice(0,10)
       .map((r) => ({...r, _val: r[c]}));
     makeBarChart(`bar-${p}`, top10, lbl, color);
   });
   document.getElementById("bar-sub").textContent =
-    `${scale==="norm"?"z-score normalised":"Unscaled raw"} values · ${year} · top 10 by each proxy`;
-}
-
-// ── Render: network strength bar charts ───────────────────────────────────
-
-function renderStrength(year) {
-  const rows = allData[year] || [];
-  [
-    ["in-strength",  "in_strength",  "In-strength (supplier dependence)",  "#0D5C4A"],
-    ["out-strength", "out_strength", "Out-strength (supply provision)",     "#3D9E82"]
-  ].forEach(([id, metric, baseLabel, color]) => {
-    const normMetric = `${metric}_norm`;
-    const c = scale === "norm" ? normMetric : metric;
-    const lbl = `${baseLabel}${scale === "norm" ? " (z-score)" : " (raw)"}`;
-    const valid = rows.filter((r) => r[c] != null && !isNaN(r[c]));
-    const top10 = [...valid].sort((a,b) => b[c]-a[c]).slice(0,10)
-      .map((r) => ({...r, _val: r[c]}));
-    makeBarChart(`bar-${id}`, top10, lbl, color);
-  });
-  document.getElementById("strength-sub").textContent =
-    `${scale==="norm"?"z-score normalised":"Unscaled raw"} values · ${year} · top 10 by each strength measure`;
+    `${scale==="norm"?"z-score normalised":"Unscaled raw"} values · ${yearLbl} · top 10 by each proxy`;
 }
 
 // ── Render: correlation charts ────────────────────────────────────────────
 
-function renderCorrelations() {
-  [["contribution","Digital contribution"],["depth","Digital depth"]].forEach(([p,baseLabel]) => {
-    destroyChart(`corr-${p}`);
-    const data   = corrData[p] || [];
-    const years  = data.map((d)=>d.year);
-    const rs     = data.map((d)=>isNaN(d.r)  ? null : +d.r.toFixed(3));
-    const los    = data.map((d)=>isNaN(d.lo) ? null : +d.lo.toFixed(3));
-    const his    = data.map((d)=>isNaN(d.hi) ? null : +d.hi.toFixed(3));
-    const isActive   = p===proxy;
-    const lineColor  = isActive ? "#185FA5" : "#CCCCCC";
-    const fillColor  = isActive ? "#185FA520" : "#CCCCCC18";
+// Four centrality measures, each with a distinct colour.
+const CENT_LINE_COLORS = {
+  pagerank:     "#0D5C4A",
+  betweenness:  "#3D9E82",
+  in_strength:  "#1A567A",
+  out_strength: "#A07840",
+};
 
-    charts[`corr-${p}`] = new Chart(document.getElementById(`corr-${p}`).getContext("2d"), {
+function renderCorrelations() {
+  // One chart per proxy (contribution / depth).
+  // Each chart has 4 lines — one per centrality measure.
+  [["contribution","Digital contribution"],["depth","Digital depth"]].forEach(([p, baseLabel]) => {
+    destroyChart(`corr-${p}`);
+    const canvas = document.getElementById(`corr-${p}`);
+    canvas.style.height = "260px";
+
+    // Build one dataset per centrality measure.
+    const datasets = Object.entries(CENTRALITY_LABELS).map(([cent, centLbl]) => {
+      const data = buildCorrData(cent)[p] || [];
+      const rs   = data.map((d) => isNaN(d.r) ? null : +d.r.toFixed(3));
+      const color = CENT_LINE_COLORS[cent];
+      return {
+        label: centLbl,
+        data: rs,
+        borderColor: color,
+        backgroundColor: color,
+        pointRadius: 4, pointHoverRadius: 6,
+        borderWidth: 2, tension: 0.3, fill: false,
+      };
+    });
+
+    charts[`corr-${p}`] = new Chart(canvas.getContext("2d"), {
       type: "line",
-      data: {
-        labels: years,
-        datasets: [
-          {label:"CI upper", data:his, borderColor:"transparent", backgroundColor:fillColor, pointRadius:0, fill:"+1", tension:0.3, order:3},
-          {label:"CI lower", data:los, borderColor:"transparent", backgroundColor:fillColor, pointRadius:0, fill:false, tension:0.3, order:4},
-          {label:"Spearman r", data:rs, borderColor:lineColor, backgroundColor:lineColor, pointRadius:5, pointHoverRadius:7, borderWidth:2, tension:0.3, fill:false, order:1}
-        ]
-      },
+      data: { labels: YEARS, datasets },
       options: {
         _showZero: true,
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
-          legend: {display:false},
+          legend: { display: true, position: "bottom",
+            labels: { boxWidth: 12, font: {size:11}, padding: 14 } },
           title: {
-            display: true, text: `PageRank vs ${baseLabel}`,
-            font: {size:13, family:"DM Sans", weight: isActive?"600":"400"},
-            color: isActive?"#0F1B2D":"#AAAAAA", padding:{bottom:12}
+            display: true, text: `Spearman ρ vs ${baseLabel}`,
+            font: {size:13, family:"DM Sans", weight:"500"},
+            color: "#0B1E1A", padding: {bottom:10}
           },
           tooltip: {
-            filter: (item) => item.datasetIndex===2,
             callbacks: {
               label: (c) => {
-                const i = c.dataIndex;
-                const sig = Math.abs(rs[i]) >= 0.30 ? " ✓ sig." : " n.s.";
-                return [`r = ${rs[i]}${sig}`, `95% CI [${los[i]}, ${his[i]}]`, `n = ${data[i].n}`];
+                const r = c.raw;
+                if (r == null) return null;
+                const sig = Math.abs(r) >= 0.30 ? " ✓" : " n.s.";
+                return ` ${c.dataset.label}: ${r}${sig}`;
               }
             }
           }
         },
         scales: {
-          x: {grid:{color:"#EAE8E0"}, ticks:{font:{size:11}}},
-          y: {min:-1, max:1, grid:{color:"#EAE8E0"}, ticks:{font:{size:11}, stepSize:0.5}}
+          x: { grid:{color:"#C0D8D4"}, ticks:{font:{size:11}} },
+          y: { min:-1, max:1, grid:{color:"#C0D8D4"}, ticks:{font:{size:11}, stepSize:0.5},
+               border:{display:true, color:"#2A5A52", width:2} }
         }
       }
     });
@@ -506,50 +518,65 @@ function renderCorrelations() {
 
 function renderQuadrant(year, p) {
   // _norm columns are global z-scores (mean=0, std=1 across all 6 years ×
-  // 49 sectors). Threshold = 0 means above/below the global mean, which is
-  // a natural and year-comparable split.
-  const qc  = p==="contribution" ? "dig_contribution_norm" : "dig_depth_norm";
-  const lbl = p==="contribution" ? "Digital contribution (z-score)"
-                                 : "Digital depth (z-score)";
-  const rows = (allData[year]||[]).filter((r)=>r.pagerank_norm!=null && r[qc]!=null);
+  // 49 sectors). Threshold = 0 means above/below the global mean.
+  const qc      = p==="contribution" ? "dig_contribution_norm" : "dig_depth_norm";
+  const digLbl  = p==="contribution" ? "Digital contribution (z-score)" : "Digital depth (z-score)";
+  const centCol = `${centrality}_norm`;
+  const centLbl = `${CENTRALITY_LABELS[centrality]} (z-score)`;
+
+  const rows = (allData[year]||[]).filter((r)=>r[centCol]!=null && r[qc]!=null);
   destroyChart("quad-chart");
+
+  const canvas = document.getElementById("quad-chart");
+  canvas.style.height = "540px";
+
+  // Compute axis bounds with padding so points sit away from edges
+  const xs  = rows.map((r) => r[qc]);
+  const ys  = rows.map((r) => r[centCol]);
+  const pad = 0.6;
+  const xMin = Math.floor(Math.min(...xs) - pad);
+  const xMax = Math.ceil(Math.max(...xs)  + pad);
+  const yMin = Math.floor(Math.min(...ys) - pad);
+  const yMax = Math.ceil(Math.max(...ys)  + pad);
 
   const datasets = ["HH","HL","LH","LL"].map((q) => ({
     label: Q_LABEL[q],
-    data: rows.filter((r)=>assignQ(r.pagerank_norm, r[qc])===q)
-      .map((r) => ({x:+r[qc].toFixed(4), y:+r.pagerank_norm.toFixed(4), label:r.icio_code, name:r.sector_name})),
+    data: rows.filter((r)=>assignQ(r[centCol], r[qc])===q)
+      .map((r) => ({x:+r[qc].toFixed(4), y:+r[centCol].toFixed(4), label:r.icio_code, name:r.sector_name})),
     backgroundColor:`${Q_COL[q]}BB`, borderColor:Q_COL[q],
-    borderWidth:1, pointRadius:7, pointHoverRadius:9
+    borderWidth:1, pointRadius:8, pointHoverRadius:11
   }));
 
-  charts["quad-chart"] = new Chart(document.getElementById("quad-chart").getContext("2d"), {
+  charts["quad-chart"] = new Chart(canvas.getContext("2d"), {
     type:"scatter", data:{datasets},
     options: {
-      _isQuad: true, responsive: true,
+      _isQuad: true, responsive: true, maintainAspectRatio: false,
+      animation: { duration: 400, easing: "easeOutQuart" },
       plugins: {
         legend: {display:false},
         tooltip: {
           callbacks: {
             title: (items) => items[0].raw.name||items[0].raw.label,
-            label: (c) => [`Code: ${c.raw.label}`, `Digital (norm.): ${c.raw.x}`, `PageRank (norm.): ${c.raw.y}`]
+            label: (c) => [`Code: ${c.raw.label}`, `Digital (norm.): ${c.raw.x}`, `${CENTRALITY_LABELS[centrality]} (norm.): ${c.raw.y}`]
           }
         }
       },
       scales: {
-        x: {title:{display:true, text:lbl, font:{size:12}, color:"#5F5E5A"}, grid:{color:"#EAE8E018"}, ticks:{font:{size:11}}},
-        y: {title:{display:true, text:"PageRank (z-score)", font:{size:12}, color:"#5F5E5A"}, grid:{color:"#EAE8E018"}, ticks:{font:{size:11}}}
+        x: {min:xMin, max:xMax, title:{display:true, text:digLbl,  font:{size:12}, color:"#5F5E5A"}, grid:{color:"#D4E4E018"}, ticks:{font:{size:11}}},
+        y: {min:yMin, max:yMax, title:{display:true, text:centLbl, font:{size:12}, color:"#5F5E5A"}, grid:{color:"#D4E4E018"}, ticks:{font:{size:11}}}
       }
     }
   });
 
   document.getElementById("quad-sub").textContent =
-    `Split at z = 0 (global mean) · ${year} · ${lbl} · hover for details`;
+    `Split at z = 0 (global mean) · ${year} · y-axis: ${CENTRALITY_LABELS[centrality]} · x-axis: ${digLbl}`;
 }
 
 // ── Render: sector data table ─────────────────────────────────────────────
 
 function renderTable(year) {
-  const rows  = (allData[year]||[]).slice().sort((a,b)=>(b.pagerank??-Infinity)-(a.pagerank??-Infinity));
+  const rows  = (allData[year]||[]).slice()
+    .sort((a,b)=>(b.pagerank??-Infinity)-(a.pagerank??-Infinity));
   const tbody = document.getElementById("tbl-body");
   if (!tbody) return;
 
@@ -586,7 +613,7 @@ function renderTable(year) {
   }).join("");
 
   document.getElementById("tbl-sub").textContent =
-    `Sorted by raw PageRank · ${year} · metrics shown: ${scale==="norm"?"normalised (globally norm.)":"raw"} · quadrants always use globally norm. norm`;
+    `Sorted by raw PageRank · ${year} · metrics shown: ${scale==="norm"?"normalised":"raw"} · quadrants use globally normalised values`;
 }
 
 // ── View routing ──────────────────────────────────────────────────────────
@@ -598,11 +625,10 @@ function renderTable(year) {
 //   Table:       Year ✓  Proxy ✗  Scale ✓
 
 const CTRL_VISIBILITY = {
-  rankings:    {year:true,  proxy:false, scale:true },
-  quadrant:    {year:true,  proxy:true,  scale:false},
-  correlation: {year:false, proxy:true,  scale:false},
-  strength:    {year:true,  proxy:false, scale:true },
-  table:       {year:true,  proxy:false, scale:true }
+  rankings:    {year:true,  proxy:false, centrality:false, scale:true },
+  quadrant:    {year:true,  proxy:true,  centrality:true,  scale:false},
+  correlation: {year:false, proxy:false, centrality:false, scale:false},
+  table:       {year:true,  proxy:false, centrality:false, scale:true },
 };
 
 function showView(v) {
@@ -610,9 +636,20 @@ function showView(v) {
   document.getElementById(`view-${v}`).classList.add("active");
   currentView = v;
   const vis = CTRL_VISIBILITY[v];
-  document.getElementById("ctrl-year").style.display  = vis.year  ? "" : "none";
-  document.getElementById("ctrl-proxy").style.display = vis.proxy ? "" : "none";
-  document.getElementById("ctrl-scale").style.display = vis.scale ? "" : "none";
+  document.getElementById("ctrl-year").style.display       = vis.year       ? "" : "none";
+  document.getElementById("ctrl-proxy").style.display      = vis.proxy      ? "" : "none";
+  document.getElementById("ctrl-centrality").style.display = vis.centrality ? "" : "none";
+  document.getElementById("ctrl-scale").style.display      = vis.scale      ? "" : "none";
+  // "Average" year option only available in views that support it
+  const vis2 = CTRL_VISIBILITY[v];
+  const avgAllowed = v === "rankings" || (vis2 && vis2.avgOk);
+  const optAvg = document.getElementById("opt-avg");
+  if (optAvg) optAvg.style.display = avgAllowed ? "" : "none";
+  // Reset to 2021 when switching to a view that doesn't support avg
+  if (!avgAllowed && currentYear === "avg") {
+    currentYear = 2021;
+    document.getElementById("year-sel").value = "2021";
+  }
 }
 
 function switchView(v, btn) {
@@ -623,7 +660,8 @@ function switchView(v, btn) {
 }
 
 function onYearChange() {
-  currentYear = parseInt(document.getElementById("year-sel").value, 10);
+  const v = document.getElementById("year-sel").value;
+  currentYear = v === "avg" ? "avg" : parseInt(v, 10);
   if (dataReady) renderAll();
 }
 
@@ -641,20 +679,27 @@ function setScale(s) {
   if (dataReady) renderAll();
 }
 
+function setCentrality(c) {
+  centrality = c;
+  ["pagerank","betweenness","in_strength","out_strength"].forEach((id) =>
+    document.getElementById(`pill-${id}`).classList.toggle("active", id===c)
+  );
+  if (dataReady) renderAll();
+}
+
 function renderAll() {
   renderKPIs(currentYear);
   if (currentView==="rankings")    renderBars(currentYear);
   if (currentView==="quadrant")    renderQuadrant(currentYear, proxy);
   if (currentView==="correlation") renderCorrelations();
-  if (currentView==="strength")    renderStrength(currentYear);
   if (currentView==="table")       renderTable(currentYear);
 }
 
-window.switchView   = switchView;
-window.onYearChange = onYearChange;
-window.setProxy     = setProxy;
-window.setScale     = setScale;
-window.allData      = allData;
-window.corrData     = corrData;
+window.switchView    = switchView;
+window.onYearChange  = onYearChange;
+window.setProxy      = setProxy;
+window.setScale      = setScale;
+window.setCentrality = setCentrality;
+window.allData       = allData;
 
 loadAll();
