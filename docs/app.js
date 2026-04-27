@@ -489,7 +489,7 @@ function renderCorrelations() {
           legend: { display: true, position: "bottom",
             labels: { boxWidth: 12, font: {size:11}, padding: 14 } },
           title: {
-            display: true, text: `Spearman ρ vs ${baseLabel}`,
+            display: true, text: `Correlation vs ${baseLabel}`,
             font: {size:13, family:"DM Sans", weight:"500"},
             color: "#0B1E1A", padding: {bottom:10}
           },

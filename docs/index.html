@@ -26,7 +26,7 @@
 <nav>
   <button class="active" onclick="switchView('rankings',this)">Digitalisation rankings</button>
   <button onclick="switchView('quadrant',this)">Quadrant classification</button>
-  <button onclick="switchView('correlation',this)">Spearman correlation</button>
+  <button onclick="switchView('correlation',this)">Correlation</button>
   <button onclick="switchView('table',this)">Sector data</button>
 </nav>
 
@@ -89,9 +89,9 @@
   <!-- Correlation -->
   <div class="view" id="view-correlation">
     <div class="card">
-      <div class="card-title">Spearman rank correlation over time</div>
+      <div class="card-title">Correlation over time</div>
       <div class="card-sub">
-        Spearman ρ between each centrality measure and each digitalisation proxy &middot; 2016&ndash;2021 &middot;
+        Rank correlation between each centrality measure and each digitalisation proxy &middot; 2016&ndash;2021 &middot;
         Hover a point for significance · |<i>r</i>|&nbsp;&ge;&nbsp;0.30 marked ✓
       </div>
       <div class="chart-row">

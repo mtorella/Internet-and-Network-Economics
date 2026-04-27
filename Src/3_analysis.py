@@ -95,7 +95,7 @@ for year in YEARS:
     print(f"fig_bars_{year}.png saved")
 
 
-# ── Figure 3: Spearman correlation over time ──────────────────────────────
+# ── Figure 3: Rank correlation over time ──────────────────────────────────
 def spearman_ci(x: pd.Series, y: pd.Series, alpha: float = 0.05):
     mask = x.notna() & y.notna()
     x, y = x[mask], y[mask]
@@ -119,7 +119,7 @@ for year in YEARS:
 corr_df = pd.DataFrame(corr_records)
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-fig.suptitle("Spearman Rank Correlation over Time (2016–2021)", fontsize=13, fontweight="bold")
+fig.suptitle("Rank Correlation over Time (2016–2021)", fontsize=13, fontweight="bold")
 
 for ax, (col, title) in zip(axes, PAIRS):
     sub = corr_df[corr_df["metric"] == col].sort_values("year")
@@ -127,7 +127,7 @@ for ax, (col, title) in zip(axes, PAIRS):
     ax.fill_between(sub["year"], sub["ci_lo"], sub["ci_hi"], alpha=0.2, color="steelblue", label="95% CI")
     ax.axhline(0, color="grey", linestyle="--", linewidth=0.8)
     ax.set_xlabel("Year")
-    ax.set_ylabel("Spearman r")
+    ax.set_ylabel("Correlation (r)")
     ax.set_title(f"PageRank vs {title}")
     ax.set_xticks(YEARS)
     ax.legend(fontsize=9)
