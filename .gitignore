@@ -25,8 +25,8 @@ Thumbs.db
 # Resources
 Resources/
 
-# Outputs
-outputs/
+# Outputs (tables are generated — figures are committed for README display)
+outputs/tables/
 
 # Test
 tests/

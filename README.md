@@ -246,9 +246,9 @@ The repository is currently organised as follows:
 - `Src/1_preprocessing.py`: builds annual digitalisation files (`digitalisation_YYYY.csv`) and extracts annual ICIO Z-block files (`icio_zblock_YYYY.csv`).
 - `Src/2_network_centrality.py`: computes network centrality indicators from each yearly Z-block and writes `centrality_YYYY.csv`.
 - `Src/3_analysis.py`: merges annual centrality and digitalisation files and generates figures and per-year output tables.
-- `Src/4_build_dashboard_bundle.py`: generates the dashboard data bundle (`dashboard/data.bundle.js`).
+- `Src/4_build_dashboard_bundle.py`: generates the dashboard data bundle (`docs/data.bundle.js`).
 - `Src/5_Full_Pipeline.py`: runs the full workflow end-to-end.
-- `dashboard/index.html`, `dashboard/styles.css`, `dashboard/app.js`: interactive dashboard.
+- `docs/index.html`, `docs/styles.css`, `docs/app.js`: interactive dashboard.
 
 Suggested execution order:
 
@@ -261,4 +261,6 @@ Alternative:
 
 1. `python Src/5_Full_Pipeline.py`
 
-To view the dashboard, open `dashboard/index.html` in your browser (or serve via `python -m http.server 8000` and open `/dashboard/index.html`).
+The dashboard is live at **https://mtorella.github.io/Internet-and-Network-Economics/**
+
+To run locally, serve via `python -m http.server 8000` and open `http://localhost:8000/docs/index.html`.
