@@ -52,9 +52,10 @@ let proxy       = "contribution"; // "contribution" | "depth"
 let centrality  = "pagerank";     // "pagerank" | "betweenness" | "in_strength" | "out_strength"
 let scale       = "raw";          // "raw" | "norm"
 let currentYear = "avg";
-let allData     = {};
-let charts      = {};
-let dataReady   = false;
+let allData      = {};
+let charts       = {};
+let dataReady    = false;
+let globalBounds = {}; // { colName: {min, max} } — fixed across all years
 let currentView = "rankings";
 
 const CENTRALITY_LABELS = {
@@ -65,6 +66,26 @@ const CENTRALITY_LABELS = {
 };
 
 function sectorName(icio) { return SECTOR_NAMES[icio] || icio; }
+
+
+function computeGlobalBounds() {
+  const NORM_COLS = [
+    "pagerank_norm", "betweenness_norm", "in_strength_norm", "out_strength_norm",
+    "dig_contribution_norm", "dig_depth_norm",
+  ];
+  const PAD = 1.2;
+  globalBounds = {};
+  NORM_COLS.forEach((col) => {
+    const vals = YEARS.flatMap((y) =>
+      (allData[y] || []).map((r) => r[col]).filter((v) => v != null && !isNaN(v))
+    );
+    if (!vals.length) return;
+    globalBounds[col] = {
+      min: Math.floor(Math.min(...vals) - PAD),
+      max: Math.ceil(Math.max(...vals)  + PAD),
+    };
+  });
+}
 
 function fmt(v, decimals = 3) {
   if (v == null || isNaN(v)) return "—";
@@ -200,6 +221,7 @@ async function loadAll() {
       );
       const sample = allData[2021] || [];
       if (!sample.length) throw new Error("Bundled data is empty.");
+      computeGlobalBounds();
       dataReady = true;
       const withDig = sample.filter((r) => r.dig_contribution_norm != null).length;
       document.getElementById("status").style.display = "none";
@@ -227,6 +249,7 @@ async function loadAll() {
       `${[...new Set(sample.slice(0,6).map((r)=>r.icio_code))].join(", ")}`
     );
 
+    computeGlobalBounds();
     dataReady = true;
     document.getElementById("status").style.display = "none";
     document.getElementById("load-msg").textContent =
@@ -342,8 +365,8 @@ Chart.register({
       chart.getDatasetMeta(di).data.forEach((pt,i) => {
         const lbl = ds.data[i]?.label;
         if (!lbl) return;
-        ctx.save(); ctx.font="8px monospace"; ctx.fillStyle="rgba(15,27,45,0.62)";
-        ctx.fillText(lbl, pt.x+5, pt.y-4); ctx.restore();
+        ctx.save(); ctx.font="bold 11px monospace"; ctx.fillStyle="rgba(10,20,18,0.85)";
+        ctx.fillText(lbl, pt.x+6, pt.y-6); ctx.restore();
       });
     });
   }
@@ -528,16 +551,14 @@ function renderQuadrant(year, p) {
   destroyChart("quad-chart");
 
   const canvas = document.getElementById("quad-chart");
-  canvas.style.height = "540px";
+  canvas.style.height = "720px";
+  canvas.style.width  = "";
 
-  // Compute axis bounds with padding so points sit away from edges
-  const xs  = rows.map((r) => r[qc]);
-  const ys  = rows.map((r) => r[centCol]);
-  const pad = 0.6;
-  const xMin = Math.floor(Math.min(...xs) - pad);
-  const xMax = Math.ceil(Math.max(...xs)  + pad);
-  const yMin = Math.floor(Math.min(...ys) - pad);
-  const yMax = Math.ceil(Math.max(...ys)  + pad);
+  // Use global bounds (fixed across all years) so the axis scale is stable
+  const xMin = -4.5;
+  const xMax =  6.5;
+  const yMin = globalBounds[centCol]?.min ?? -4;
+  const yMax = globalBounds[centCol]?.max ??  4;
 
   const datasets = ["HH","HL","LH","LL"].map((q) => ({
     label: Q_LABEL[q],

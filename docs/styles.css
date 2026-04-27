@@ -172,6 +172,10 @@ nav button.active { color: #fff; border-bottom-color: var(--blue-l); }
 
 main { padding: 28px 48px 56px; }
 
+/* Quadrant view gets full viewport width — remove side padding and card margins */
+#view-quadrant { margin: 0 -48px; }
+#view-quadrant .card { border-radius: 0; border-left: none; border-right: none; padding-left: 16px; padding-right: 16px; }
+
 .view { display: none; }
 .view.active { display: block; animation: fadeUp 0.3s ease both; }
 
