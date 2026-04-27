@@ -5,7 +5,7 @@
   --blue:   #0D5C4A;
   --blue-l: #3D9E82;
   --teal:   #1A7A64;
-  --sand:   #F0F5F3;
+  --sand:   #E8F5EF;
   --muted:  #6A8E87;
   --border: #C4D8D2;
   --hh: #0D5C4A;
@@ -159,8 +159,8 @@ nav button.active { color: #fff; border-bottom-color: var(--blue-l); }
   user-select: none;
 }
 
-.pill:hover { border-color: var(--blue); color: var(--blue); }
-.pill.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+.pill:hover  { border-color: var(--blue); color: var(--blue); }
+.pill.active { background: var(--blue); color: #fff; border-color: var(--blue); }
 
 #load-msg {
   font-size: 12px;
@@ -311,10 +311,20 @@ main { padding: 28px 48px 56px; }
 
 /* ── Quadrant scatter ────────────────────────────────────────────────────── */
 
+.quad-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.quad-note {
+  margin-bottom: 0;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
 .quad-wrap {
   width: 100%;
-  max-width: 760px;
-  margin: 0 auto;
 }
 
 .q-legend {
@@ -323,6 +333,15 @@ main { padding: 28px 48px 56px; }
   flex-wrap: wrap;
   margin-top: 18px;
   justify-content: center;
+}
+
+.q-legend-top {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 0;
 }
 
 .q-legend-item {
@@ -403,7 +422,7 @@ main { padding: 28px 48px 56px; }
   .chart-row { grid-template-columns: 1fr; }
   .kpi-card { min-width: 110px; padding: 12px 14px; }
   .kpi-value { font-size: 18px; }
-  .quad-wrap { max-width: 100%; }
+  .q-legend-top { gap: 12px; }
 }
 
 @media (max-width: 600px) {
