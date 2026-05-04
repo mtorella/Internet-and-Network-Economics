@@ -68,22 +68,62 @@ const CENTRALITY_LABELS = {
 function sectorName(icio) { return SECTOR_NAMES[icio] || icio; }
 
 
+function roundAxisBound(value, mode) {
+  if (!isFinite(value) || value === 0) return 0;
+  const magnitude = 10 ** Math.floor(Math.log10(Math.abs(value)));
+  const scaled = value / magnitude;
+  const rounded = mode === "min"
+    ? Math.floor(scaled * 2) / 2
+    : Math.ceil(scaled * 2) / 2;
+  return rounded * magnitude;
+}
+
+function computeAxisBounds(values, {padRatio = 0.12, symmetric = false} = {}) {
+  if (!values.length) return null;
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+
+  if (symmetric) {
+    const limit = Math.max(Math.abs(min), Math.abs(max));
+    min = -limit;
+    max = limit;
+  }
+
+  const span = Math.max(max - min, Math.abs(max), 1);
+  const pad = span * padRatio;
+  min -= pad;
+  max += pad;
+
+  if (symmetric) {
+    const limit = Math.max(Math.abs(min), Math.abs(max));
+    min = -limit;
+    max = limit;
+  }
+
+  return {
+    min: roundAxisBound(min, "min"),
+    max: roundAxisBound(max, "max"),
+  };
+}
+
 function computeGlobalBounds() {
-  const NORM_COLS = [
+  const AXIS_COLS = [
+    "pagerank", "betweenness", "in_strength", "out_strength",
     "pagerank_norm", "betweenness_norm", "in_strength_norm", "out_strength_norm",
+    "dig_contribution", "dig_depth",
     "dig_contribution_norm", "dig_depth_norm",
   ];
-  const PAD = 1.2;
+
   globalBounds = {};
-  NORM_COLS.forEach((col) => {
+  AXIS_COLS.forEach((col) => {
     const vals = YEARS.flatMap((y) =>
       (allData[y] || []).map((r) => r[col]).filter((v) => v != null && !isNaN(v))
     );
     if (!vals.length) return;
-    globalBounds[col] = {
-      min: Math.floor(Math.min(...vals) - PAD),
-      max: Math.ceil(Math.max(...vals)  + PAD),
-    };
+    globalBounds[col] = computeAxisBounds(vals, {
+      symmetric: col.endsWith("_norm"),
+      padRatio: col.endsWith("_norm") ? 0.14 : 0.08,
+    });
   });
 }
 
@@ -363,10 +403,19 @@ Chart.register({
     const {ctx} = chart;
     chart.data.datasets.forEach((ds,di) => {
       chart.getDatasetMeta(di).data.forEach((pt,i) => {
-        const lbl = ds.data[i]?.label;
+        const point = ds.data[i];
+        const lbl = point?.showLabel ? point.label : null;
         if (!lbl) return;
-        ctx.save(); ctx.font="bold 11px monospace"; ctx.fillStyle="rgba(10,20,18,0.85)";
-        ctx.fillText(lbl, pt.x+6, pt.y-6); ctx.restore();
+        ctx.save();
+        ctx.font = "600 10px DM Sans, sans-serif";
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "rgba(255,255,255,0.92)";
+        ctx.fillStyle = "rgba(10,20,18,0.88)";
+        const dx = point.labelDx ?? 8;
+        const dy = point.labelDy ?? -8;
+        ctx.strokeText(lbl, pt.x + dx, pt.y + dy);
+        ctx.fillText(lbl, pt.x + dx, pt.y + dy);
+        ctx.restore();
       });
     });
   }
@@ -374,7 +423,7 @@ Chart.register({
 
 // ── Render: bar charts ────────────────────────────────────────────────────
 
-function makeBarChart(canvasId, top10, lbl, color) {
+function makeBarChart(canvasId, top10, lbl, color, axis = {}) {
   destroyChart(canvasId);
   const canvas = document.getElementById(canvasId);
   canvas.style.height = "380px";  // pin height before Chart.js takes over
@@ -412,6 +461,8 @@ function makeBarChart(canvasId, top10, lbl, color) {
       scales: {
         x: {
           beginAtZero: true,
+          min: axis.min ?? 0,
+          max: axis.max ?? undefined,
           border: { display: true, color: "#2A5A52", width: 2 },
           grid: { color: "#C0D8D4", lineWidth: 1, drawTicks: true },
           ticks: { font: {size:11}, color: "#2A4A44", maxTicksLimit: 6 }
@@ -462,7 +513,10 @@ function renderBars(year) {
     const valid = rows.filter((r) => r[c] != null && !isNaN(r[c]));
     const top10 = [...valid].sort((a,b) => b[c]-a[c]).slice(0,10)
       .map((r) => ({...r, _val: r[c]}));
-    makeBarChart(`bar-${p}`, top10, lbl, color);
+    makeBarChart(`bar-${p}`, top10, lbl, color, {
+      min: 0,
+      max: metric === "dig_contribution" && scale === "raw" ? 2.5 : globalBounds[c]?.max
+    });
   });
   document.getElementById("bar-sub").textContent =
     `${scale==="norm"?"z-score normalised":"Unscaled raw"} values · ${yearLbl} · top 10 by each proxy`;
@@ -555,29 +609,71 @@ function renderQuadrant(year, p) {
   canvas.style.width  = "";
 
   // Use global bounds (fixed across all years) so the axis scale is stable
-  const xMin = -4.5;
-  const xMax =  6.5;
+  const xMin = globalBounds[qc]?.min ?? -4;
+  const xMax = globalBounds[qc]?.max ??  4;
   const yMin = globalBounds[centCol]?.min ?? -4;
   const yMax = globalBounds[centCol]?.max ??  4;
 
-  const datasets = ["HH","HL","LH","LL"].map((q) => ({
-    label: Q_LABEL[q],
-    data: rows.filter((r)=>assignQ(r[centCol], r[qc])===q)
-      .map((r) => ({x:+r[qc].toFixed(4), y:+r[centCol].toFixed(4), label:r.icio_code, name:r.sector_name})),
-    backgroundColor:`${Q_COL[q]}BB`, borderColor:Q_COL[q],
-    borderWidth:1, pointRadius:8, pointHoverRadius:11
-  }));
+  const labelOffsets = [
+    {dx: 8, dy: -8},
+    {dx: 8, dy: 14},
+    {dx: -34, dy: -8},
+    {dx: 10, dy: 24},
+    {dx: -42, dy: 12},
+    {dx: -26, dy: 24},
+  ];
+  const datasets = ["HH","HL","LH","LL"].map((q) => {
+    const quadRows = rows
+      .filter((r)=>assignQ(r[centCol], r[qc])===q)
+      .map((r) => ({
+        x:+r[qc].toFixed(4),
+        y:+r[centCol].toFixed(4),
+        label:r.icio_code,
+        name:r.sector_name,
+        prominence: Math.hypot(r[qc], r[centCol]),
+      }));
+
+    const labeledCodes = new Set(
+      [...quadRows]
+        .sort((a, b) => b.prominence - a.prominence)
+        .slice(0, Math.min(6, quadRows.length))
+        .map((r) => r.label)
+    );
+
+    return {
+      label: Q_LABEL[q],
+      data: quadRows.map((r, idx) => {
+        const offset = labelOffsets[idx % labelOffsets.length];
+        return {
+          ...r,
+          showLabel: labeledCodes.has(r.label) || r.prominence >= 1.35,
+          labelDx: offset.dx,
+          labelDy: offset.dy,
+        };
+      }),
+    backgroundColor:`${Q_COL[q]}CC`,
+    borderColor:"#FFFFFF",
+    pointBorderColor:Q_COL[q],
+    borderWidth:2.2,
+    pointRadius:6,
+    pointHoverRadius:9,
+    pointHitRadius:12,
+    pointHoverBorderWidth:3,
+    pointStyle:"circle"
+    };
+  });
 
   charts["quad-chart"] = new Chart(canvas.getContext("2d"), {
     type:"scatter", data:{datasets},
     options: {
       _isQuad: true, responsive: true, maintainAspectRatio: false,
       animation: { duration: 400, easing: "easeOutQuart" },
+      interaction: { mode: "nearest", intersect: true, axis: "xy" },
       plugins: {
         legend: {display:false},
         tooltip: {
           callbacks: {
-            title: (items) => items[0].raw.name||items[0].raw.label,
+            title: (items) => `${items[0].raw.label} - ${items[0].raw.name || ""}`,
             label: (c) => [`Code: ${c.raw.label}`, `Digital (norm.): ${c.raw.x}`, `${CENTRALITY_LABELS[centrality]} (norm.): ${c.raw.y}`]
           }
         }
